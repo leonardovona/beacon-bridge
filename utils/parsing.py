@@ -15,11 +15,15 @@ def hex_to_bytes(hex_string):
     byte_string = bytes.fromhex(hex_string)
     return byte_string 
 
+
+# Sometimes the sync committee bits are not 512 bits long, need to handle it
 def hex_to_bits(hex_string):
     int_representation = int(hex_string, 16)
     binary_vector = bin(int_representation) 
     if binary_vector[:2] == '0b':
         binary_vector = binary_vector[2:]
+    if(len(binary_vector) < 512):
+        print(binary_vector)
     return binary_vector 
 
 
@@ -69,13 +73,13 @@ def parse_header(header):
     )
 
 
-def parse_sync_committee(current_sync_committee):
+def parse_sync_committee(sync_committee):
     # for i in range(len(current_sync_committee['pubkeys'])):
     #    current_sync_committee['pubkeys'][i] = current_sync_committee['pubkeys'][i]
     
     return SyncCommittee(
-        pubkeys = current_sync_committee['pubkeys'],
-        aggregate_pubkey = current_sync_committee['aggregate_pubkey']
+        pubkeys = sync_committee['pubkeys'],
+        aggregate_pubkey = sync_committee['aggregate_pubkey']
     )
 
 

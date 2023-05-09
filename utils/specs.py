@@ -194,7 +194,8 @@ class LightClientUpdate(Container):
     attested_header: LightClientHeader
     # Next sync committee corresponding to `attested_header.beacon.state_root`
     next_sync_committee: SyncCommittee
-    next_sync_committee_branch: Vector[Bytes32, floorlog2(NEXT_SYNC_COMMITTEE_INDEX)]
+    next_sync_committee_branch: Vector[Bytes32,
+                                       floorlog2(NEXT_SYNC_COMMITTEE_INDEX)]
     # Finalized header corresponding to `attested_header.beacon.state_root`
     finalized_header: LightClientHeader
     finality_branch: Vector[Bytes32, floorlog2(FINALIZED_ROOT_INDEX)]
@@ -209,7 +210,8 @@ class LightClientBootstrap(Container):
     header: LightClientHeader
     # Current sync committee corresponding to `header.beacon.state_root`
     current_sync_committee: SyncCommittee
-    current_sync_committee_branch: Vector[Bytes32, floorlog2(CURRENT_SYNC_COMMITTEE_INDEX)]
+    current_sync_committee_branch: Vector[Bytes32, floorlog2(
+        CURRENT_SYNC_COMMITTEE_INDEX)]
 
 
 @dataclass
@@ -227,6 +229,7 @@ class LightClientStore(object):
     previous_max_active_participants: uint64
     current_max_active_participants: uint64
 
+
 def is_valid_merkle_branch(leaf: Bytes32, branch: Sequence[Bytes32], depth: uint64, index: uint64, root: Root) -> bool:
     """
     Check if ``leaf`` at ``index`` verifies against the Merkle ``root`` and ``branch``.
@@ -237,7 +240,7 @@ def is_valid_merkle_branch(leaf: Bytes32, branch: Sequence[Bytes32], depth: uint
     #         value = hash(branch[i] + value)
     #     else:
     #         value = hash(value + branch[i])
-    #         value 
+    #         value
     # return value == root
     return True
 
@@ -260,7 +263,7 @@ def compute_fork_data_root(current_version: Version, genesis_validators_root: Ro
     ))
 
 
-def compute_domain(domain_type: DomainType, fork_version: Version=None, genesis_validators_root: Root=None) -> Domain:
+def compute_domain(domain_type: DomainType, fork_version: Version = None, genesis_validators_root: Root = None) -> Domain:
     """
     Return the domain for the ``domain_type`` and ``fork_version``.
     """
@@ -268,7 +271,8 @@ def compute_domain(domain_type: DomainType, fork_version: Version=None, genesis_
         fork_version = config.GENESIS_FORK_VERSION
     if genesis_validators_root is None:
         genesis_validators_root = Root()  # all bytes zero by default
-    fork_data_root = compute_fork_data_root(fork_version, genesis_validators_root)
+    fork_data_root = compute_fork_data_root(
+        fork_version, genesis_validators_root)
     return Domain(domain_type + fork_data_root[:28])
 
 
@@ -310,11 +314,16 @@ def is_finality_update(update: LightClientUpdate) -> bool:
 
 def is_better_update(new_update: LightClientUpdate, old_update: LightClientUpdate) -> bool:
     # Compare supermajority (> 2/3) sync committee participation
-    max_active_participants = len(new_update.sync_aggregate.sync_committee_bits)
-    new_num_active_participants = sum(new_update.sync_aggregate.sync_committee_bits)
-    old_num_active_participants = sum(old_update.sync_aggregate.sync_committee_bits)
-    new_has_supermajority = new_num_active_participants * 3 >= max_active_participants * 2
-    old_has_supermajority = old_num_active_participants * 3 >= max_active_participants * 2
+    max_active_participants = len(
+        new_update.sync_aggregate.sync_committee_bits)
+    new_num_active_participants = sum(
+        new_update.sync_aggregate.sync_committee_bits)
+    old_num_active_participants = sum(
+        old_update.sync_aggregate.sync_committee_bits)
+    new_has_supermajority = new_num_active_participants * \
+        3 >= max_active_participants * 2
+    old_has_supermajority = old_num_active_participants * \
+        3 >= max_active_participants * 2
     if new_has_supermajority != old_has_supermajority:
         return new_has_supermajority > old_has_supermajority
     if not new_has_supermajority and new_num_active_participants != old_num_active_participants:
@@ -322,11 +331,13 @@ def is_better_update(new_update: LightClientUpdate, old_update: LightClientUpdat
 
     # Compare presence of relevant sync committee
     new_has_relevant_sync_committee = is_sync_committee_update(new_update) and (
-        compute_sync_committee_period_at_slot(new_update.attested_header.beacon.slot)
+        compute_sync_committee_period_at_slot(
+            new_update.attested_header.beacon.slot)
         == compute_sync_committee_period_at_slot(new_update.signature_slot)
     )
     old_has_relevant_sync_committee = is_sync_committee_update(old_update) and (
-        compute_sync_committee_period_at_slot(old_update.attested_header.beacon.slot)
+        compute_sync_committee_period_at_slot(
+            old_update.attested_header.beacon.slot)
         == compute_sync_committee_period_at_slot(old_update.signature_slot)
     )
     if new_has_relevant_sync_committee != old_has_relevant_sync_committee:
@@ -341,11 +352,13 @@ def is_better_update(new_update: LightClientUpdate, old_update: LightClientUpdat
     # Compare sync committee finality
     if new_has_finality:
         new_has_sync_committee_finality = (
-            compute_sync_committee_period_at_slot(new_update.finalized_header.beacon.slot)
+            compute_sync_committee_period_at_slot(
+                new_update.finalized_header.beacon.slot)
             == compute_sync_committee_period_at_slot(new_update.attested_header.beacon.slot)
         )
         old_has_sync_committee_finality = (
-            compute_sync_committee_period_at_slot(old_update.finalized_header.beacon.slot)
+            compute_sync_committee_period_at_slot(
+                old_update.finalized_header.beacon.slot)
             == compute_sync_committee_period_at_slot(old_update.attested_header.beacon.slot)
         )
         if new_has_sync_committee_finality != old_has_sync_committee_finality:
@@ -423,24 +436,29 @@ def validate_light_client_update(store: LightClientStore,
                                  genesis_validators_root: Root) -> None:
     # Verify sync committee has sufficient participants
     sync_aggregate = update.sync_aggregate
-    assert sum(sync_aggregate.sync_committee_bits) >= MIN_SYNC_COMMITTEE_PARTICIPANTS
+    assert sum(
+        sync_aggregate.sync_committee_bits) >= MIN_SYNC_COMMITTEE_PARTICIPANTS
 
     # Verify update does not skip a sync committee period
     assert is_valid_light_client_header(update.attested_header)
     update_attested_slot = update.attested_header.beacon.slot
     update_finalized_slot = update.finalized_header.beacon.slot
     assert current_slot >= update.signature_slot > update_attested_slot >= update_finalized_slot
-    store_period = compute_sync_committee_period_at_slot(store.finalized_header.beacon.slot)
-    update_signature_period = compute_sync_committee_period_at_slot(update.signature_slot)
+    store_period = compute_sync_committee_period_at_slot(
+        store.finalized_header.beacon.slot)
+    update_signature_period = compute_sync_committee_period_at_slot(
+        update.signature_slot)
     if is_next_sync_committee_known(store):
         assert update_signature_period in (store_period, store_period + 1)
     else:
         assert update_signature_period == store_period
 
     # Verify update is relevant
-    update_attested_period = compute_sync_committee_period_at_slot(update_attested_slot)
+    update_attested_period = compute_sync_committee_period_at_slot(
+        update_attested_slot)
     update_has_next_sync_committee = not is_next_sync_committee_known(store) and (
-        is_sync_committee_update(update) and update_attested_period == store_period
+        is_sync_committee_update(
+            update) and update_attested_period == store_period
     )
     assert (
         update_attested_slot > store.finalized_header.beacon.slot
@@ -487,21 +505,26 @@ def validate_light_client_update(store: LightClientStore,
         sync_committee = store.current_sync_committee
     else:
         sync_committee = store.next_sync_committee
+
     participant_pubkeys = [
         pubkey for (bit, pubkey) in zip(sync_aggregate.sync_committee_bits, sync_committee.pubkeys)
         if bit
     ]
     fork_version_slot = max(update.signature_slot, Slot(1)) - Slot(1)
-    fork_version = compute_fork_version(compute_epoch_at_slot(fork_version_slot))
-    domain = compute_domain(DOMAIN_SYNC_COMMITTEE, fork_version, genesis_validators_root)
+    fork_version = compute_fork_version(
+        compute_epoch_at_slot(fork_version_slot))
+    domain = compute_domain(DOMAIN_SYNC_COMMITTEE,
+                            fork_version, genesis_validators_root)
     signing_root = compute_signing_root(update.attested_header.beacon, domain)
     # !!!! modificato
-    # assert bls.FastAggregateVerify(participant_pubkeys, signing_root, sync_aggregate.sync_committee_signature)
+    assert bls.FastAggregateVerify(participant_pubkeys, signing_root, sync_aggregate.sync_committee_signature)
 
 
 def apply_light_client_update(store: LightClientStore, update: LightClientUpdate) -> None:
-    store_period = compute_sync_committee_period_at_slot(store.finalized_header.beacon.slot)
-    update_finalized_period = compute_sync_committee_period_at_slot(update.finalized_header.beacon.slot)
+    store_period = compute_sync_committee_period_at_slot(
+        store.finalized_header.beacon.slot)
+    update_finalized_period = compute_sync_committee_period_at_slot(
+        update.finalized_header.beacon.slot)
     if not is_next_sync_committee_known(store):
         assert update_finalized_period == store_period
         store.next_sync_committee = update.next_sync_committee
@@ -535,7 +558,8 @@ def process_light_client_update(store: LightClientStore,
                                 update: LightClientUpdate,
                                 current_slot: Slot,
                                 genesis_validators_root: Root) -> None:
-    validate_light_client_update(store, update, current_slot, genesis_validators_root)
+    validate_light_client_update(
+        store, update, current_slot, genesis_validators_root)
 
     sync_committee_bits = update.sync_aggregate.sync_committee_bits
 
@@ -563,7 +587,8 @@ def process_light_client_update(store: LightClientStore,
     update_has_finalized_next_sync_committee = (
         not is_next_sync_committee_known(store)
         and is_sync_committee_update(update) and is_finality_update(update) and (
-            compute_sync_committee_period_at_slot(update.finalized_header.beacon.slot)
+            compute_sync_committee_period_at_slot(
+                update.finalized_header.beacon.slot)
             == compute_sync_committee_period_at_slot(update.attested_header.beacon.slot)
         )
     )
@@ -586,13 +611,15 @@ def process_light_client_finality_update(store: LightClientStore,
     update = LightClientUpdate(
         attested_header=finality_update.attested_header,
         next_sync_committee=SyncCommittee(),
-        next_sync_committee_branch=[Bytes32() for _ in range(floorlog2(NEXT_SYNC_COMMITTEE_INDEX))],
+        next_sync_committee_branch=[Bytes32() for _ in range(
+            floorlog2(NEXT_SYNC_COMMITTEE_INDEX))],
         finalized_header=finality_update.finalized_header,
         finality_branch=finality_update.finality_branch,
         sync_aggregate=finality_update.sync_aggregate,
         signature_slot=finality_update.signature_slot,
     )
-    process_light_client_update(store, update, current_slot, genesis_validators_root)
+    process_light_client_update(
+        store, update, current_slot, genesis_validators_root)
 
 
 def process_light_client_optimistic_update(store: LightClientStore,
@@ -602,13 +629,16 @@ def process_light_client_optimistic_update(store: LightClientStore,
     update = LightClientUpdate(
         attested_header=optimistic_update.attested_header,
         next_sync_committee=SyncCommittee(),
-        next_sync_committee_branch=[Bytes32() for _ in range(floorlog2(NEXT_SYNC_COMMITTEE_INDEX))],
+        next_sync_committee_branch=[Bytes32() for _ in range(
+            floorlog2(NEXT_SYNC_COMMITTEE_INDEX))],
         finalized_header=LightClientHeader(),
-        finality_branch=[Bytes32() for _ in range(floorlog2(FINALIZED_ROOT_INDEX))],
+        finality_branch=[Bytes32()
+                         for _ in range(floorlog2(FINALIZED_ROOT_INDEX))],
         sync_aggregate=optimistic_update.sync_aggregate,
         signature_slot=optimistic_update.signature_slot,
     )
-    process_light_client_update(store, update, current_slot, genesis_validators_root)
+    process_light_client_update(
+        store, update, current_slot, genesis_validators_root)
 
 
 def compute_fork_version(epoch: Epoch) -> Version:
@@ -626,6 +656,8 @@ def compute_fork_version(epoch: Epoch) -> Version:
 
 def compute_sync_committee_period(epoch: Epoch) -> uint64:
     return epoch // EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+
+
 def get_lc_execution_root(header: LightClientHeader) -> Root:
     epoch = compute_epoch_at_slot(header.beacon.slot)
 

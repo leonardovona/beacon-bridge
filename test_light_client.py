@@ -3,10 +3,9 @@ TO DO:
 - [ ] handle clock
 """
 from utils.specs import (
-    Root, LightClientBootstrap, initialize_light_client_store, compute_sync_committee_period_at_slot,
-    get_current_slot, uint64, config, process_light_client_update, SLOTS_PER_EPOCH, MAX_REQUEST_LIGHT_CLIENT_UPDATES,
+    Root, LightClientBootstrap, initialize_light_client_store, compute_sync_committee_period_at_slot, uint64, config, process_light_client_update, SLOTS_PER_EPOCH, MAX_REQUEST_LIGHT_CLIENT_UPDATES,
     LightClientOptimisticUpdate, process_light_client_optimistic_update, process_light_client_finality_update,
-    LightClientFinalityUpdate, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, BLSPubkey, BLSSignature)
+    LightClientFinalityUpdate, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, BLSPubkey, BLSSignature, compute_epoch_at_slot)
 
 import time
 
@@ -18,7 +17,7 @@ import math
 
 import asyncio
 
-from utils.clock import get_current_slot, compute_sync_period_at_slot, compute_epoch_at_slot, compute_sync_period_at_epoch
+from utils.clock import get_current_slot, compute_sync_period_at_epoch
 
 # Takes into account possible clock drifts. The low value provied protection against a server sending updates too far in the future
 MAX_CLOCK_DISPARITY_SEC = 10
@@ -176,10 +175,10 @@ async def main():
 
     print("Start syncing")
     # Compute the current sync period
-    current_period = compute_sync_period_at_slot(get_current_slot()) # ! cambia con funzioni di mainnet
+    current_period = compute_sync_committee_period_at_slot(get_current_slot()) # ! cambia con funzioni di mainnet
         
     # Compute the sync period associated with the optimistic header
-    last_period = compute_sync_period_at_slot(light_client_store.optimistic_header.beacon.slot)
+    last_period = compute_sync_committee_period_at_slot(light_client_store.optimistic_header.beacon.slot)
 
     # SYNC
     sync(light_client_store, last_period, current_period)
@@ -195,11 +194,11 @@ async def main():
         # ! evaluate to insert an optimistic update
 
         # when close to the end of a sync period poll for sync committee updates
-        current_epoch = compute_epoch_at_slot(get_current_slot())
-        epoch_in_sync_period = current_epoch % EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+        current_slot = get_current_slot()
+        epoch_in_sync_period = compute_epoch_at_slot(current_slot) % EPOCHS_PER_SYNC_COMMITTEE_PERIOD
 
         if(EPOCHS_PER_SYNC_COMMITTEE_PERIOD - epoch_in_sync_period <= LOOKAHEAD_EPOCHS_COMMITTEE_SYNC):
-            period = compute_sync_period_at_epoch(current_epoch)
+            period = compute_sync_committee_period_at_slot(current_slot)
             sync(period, period)
         
         print("Polling next sync committee update in", time_until_next_epoch(), " secs")

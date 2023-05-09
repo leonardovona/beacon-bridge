@@ -3,9 +3,9 @@ TO DO:
 - [ ] handle clock
 """
 from utils.specs import (
-    Root, LightClientBootstrap, initialize_light_client_store, compute_sync_committee_period_at_slot, uint64, config, process_light_client_update, SLOTS_PER_EPOCH, MAX_REQUEST_LIGHT_CLIENT_UPDATES,
+    Root, LightClientBootstrap, initialize_light_client_store, compute_sync_committee_period_at_slot, process_light_client_update, MAX_REQUEST_LIGHT_CLIENT_UPDATES,
     LightClientOptimisticUpdate, process_light_client_optimistic_update, process_light_client_finality_update,
-    LightClientFinalityUpdate, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, BLSPubkey, BLSSignature, compute_epoch_at_slot)
+    LightClientFinalityUpdate, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, compute_epoch_at_slot)
 
 import time
 
@@ -17,7 +17,7 @@ import math
 
 import asyncio
 
-from utils.clock import get_current_slot, compute_sync_period_at_epoch
+from utils.clock import get_current_slot, time_until_next_epoch
 
 # Takes into account possible clock drifts. The low value provied protection against a server sending updates too far in the future
 MAX_CLOCK_DISPARITY_SEC = 10
@@ -29,23 +29,18 @@ LOOKAHEAD_EPOCHS_COMMITTEE_SYNC = 8
 
 ENDPOINT_NODE_URL = "https://lodestar-mainnet.chainsafe.io"
 
-genesis_validators_root = '0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2' # sostituire usando /eth1/v1/beacon/genesis
-
-
-def time_until_next_epoch():
-    millis_per_epoch = int(SLOTS_PER_EPOCH) * int(config.SECONDS_PER_SLOT) * 1000
-    millis_from_genesis = round(time.time_ns() // 1_000_000) - int(config.MIN_GENESIS_TIME) * 1000
-
-    if millis_from_genesis >= 0:
-        return millis_per_epoch - (millis_from_genesis % millis_per_epoch)
-    else:
-        return abs(millis_from_genesis % millis_per_epoch)
-
 
 def beacon_api(url):
     response = requests.get(url)
     assert response.ok
     return response.json()
+
+
+def get_genesis_validators_root():
+    return Root(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/genesis")['data']['genesis_validators_root'])
+
+
+genesis_validators_root = get_genesis_validators_root()
 
 
 def updates_for_period(sync_period, count):
@@ -54,7 +49,7 @@ def updates_for_period(sync_period, count):
 
 
 def get_trusted_block_root():
-    return Root(parsing.hex_to_bytes(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/headers/finalized")['data']['root']))
+    return Root(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/headers/finalized")['data']['root'])
 
 
 def get_light_client_bootstrap(trusted_block_root):

@@ -1,13 +1,7 @@
-"""
-TO DO:
-- [ ] handle clock
-"""
 from utils.specs import (
     Root, LightClientBootstrap, initialize_light_client_store, compute_sync_committee_period_at_slot, process_light_client_update, MAX_REQUEST_LIGHT_CLIENT_UPDATES,
     LightClientOptimisticUpdate, process_light_client_optimistic_update, process_light_client_finality_update,
     LightClientFinalityUpdate, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, compute_epoch_at_slot)
-
-import time
 
 import utils.parsing as parsing
 
@@ -19,7 +13,7 @@ import asyncio
 
 from utils.clock import get_current_slot, time_until_next_epoch
 
-# Takes into account possible clock drifts. The low value provied protection against a server sending updates too far in the future
+# Takes into account possible clock drifts. The low value provides protection against a server sending updates too far in the future
 MAX_CLOCK_DISPARITY_SEC = 10
 
 OPTIMISTIC_UPDATE_POLL_INTERVAL = 12
@@ -115,8 +109,10 @@ async def handle_optimistic_updates(light_client_store):
                                                     optimistic_update, 
                                                     get_current_slot(tolerance=MAX_CLOCK_DISPARITY_SEC),
                                                     genesis_validators_root)
-        except AssertionError: 
-            print("Unable to retrieve optimistic update")
+        # In case of sync_committee_bits length is less than 512, remerkleable throws an Exception
+        # In case of failure during API call, beacon_api throws an AssertionError
+        except (AssertionError, Exception): 
+                print("Unable to retrieve optimistic update")
 
         await asyncio.sleep(OPTIMISTIC_UPDATE_POLL_INTERVAL)
 
@@ -132,6 +128,7 @@ def get_finality_update():
         signature_slot = int(finality_update['signature_slot'])
     )
 
+
 async def handle_finality_updates(light_client_store):
     last_finality_update = None
     while True:
@@ -144,7 +141,9 @@ async def handle_finality_updates(light_client_store):
                                                         finality_update, 
                                                         get_current_slot(tolerance=MAX_CLOCK_DISPARITY_SEC),
                                                         genesis_validators_root)
-        except AssertionError:
+        # In case of sync_committee_bits length is less than 512, remerkleable throws an Exception
+        # In case of failure during API call, beacon_api throws an AssertionError
+        except (AssertionError, Exception): 
             print("Unable to retrieve finality update")
 
         await asyncio.sleep(FINALITY_UPDATE_POLL_INTERVAL)

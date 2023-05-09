@@ -16,14 +16,11 @@ def hex_to_bytes(hex_string):
     return byte_string 
 
 
-# Sometimes the sync committee bits are not 512 bits long, need to handle it
 def hex_to_bits(hex_string):
     int_representation = int(hex_string, 16)
     binary_vector = bin(int_representation) 
     if binary_vector[:2] == '0b':
         binary_vector = binary_vector[2:]
-    if(len(binary_vector) < 512):
-        print(binary_vector)
     return binary_vector 
 
 
@@ -91,6 +88,7 @@ def parse_sync_committee(sync_committee):
 
 def parse_sync_aggregate(aggregate_message):
     return SyncAggregate(
+        # Sometimes the sync committee bits are not 512 bits long, in that case it throws an Exception
         sync_committee_bits = hex_to_bits(aggregate_message['sync_committee_bits']), 
         sync_committee_signature = aggregate_message['sync_committee_signature']
     )

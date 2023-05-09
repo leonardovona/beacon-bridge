@@ -41,14 +41,11 @@ def get_current_slot(tolerance=0):
     diff_in_seconds = time.time() - config.MIN_GENESIS_TIME + tolerance
     return Slot(math.floor(diff_in_seconds / config.SECONDS_PER_SLOT))
 
-
 def time_until_next_epoch():
-    millis_per_epoch = int(SLOTS_PER_EPOCH) * \
-        int(config.SECONDS_PER_SLOT) * 1000
-    millis_from_genesis = round(
-        time.time_ns() // 1_000_000) - int(config.MIN_GENESIS_TIME) * 1000
+    millis_per_epoch = int(SLOTS_PER_EPOCH) * int(config.SECONDS_PER_SLOT) * 1000
+    millis_from_genesis = round(time.time_ns() // 1_000_000) - int(config.MIN_GENESIS_TIME) * 1000
 
     if millis_from_genesis >= 0:
-        return millis_per_epoch - (millis_from_genesis % millis_per_epoch)
+        return (millis_per_epoch - (millis_from_genesis % millis_per_epoch)) / 1000
     else:
-        return abs(millis_from_genesis % millis_per_epoch)
+        return abs((millis_from_genesis % millis_per_epoch)) / 1000

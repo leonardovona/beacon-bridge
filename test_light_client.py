@@ -33,6 +33,7 @@ def beacon_api(url):
 
 def get_genesis_validators_root():
     return Root(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/genesis")['data']['genesis_validators_root'])
+    # return Root(parsing.hex_to_bytes(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/genesis")['data']['genesis_validators_root']))
 
 
 genesis_validators_root = get_genesis_validators_root()
@@ -45,6 +46,7 @@ def updates_for_period(sync_period, count):
 
 def get_trusted_block_root():
     return Root(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/headers/finalized")['data']['root'])
+    # return Root(parsing.hex_to_bytes(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/headers/finalized")['data']['root']))
 
 
 def get_light_client_bootstrap(trusted_block_root):
@@ -56,7 +58,7 @@ def get_light_client_bootstrap(trusted_block_root):
         current_sync_committee=parsing.parse_sync_committee(
             response['current_sync_committee']),
         current_sync_committee_branch=response['current_sync_committee_branch']
-        # current_sync_committee_branch = parsing.parse_current_sync_committee_branch(response['current_sync_committee_branch'])
+        # current_sync_committee_branch = map(parsing.hex_to_bytes, response['current_sync_committee_branch'])
     )
 
 
@@ -136,6 +138,7 @@ def get_finality_update():
         finalized_header=parsing.parse_header(
             finality_update['finalized_header']),
         finality_branch=finality_update['finality_branch'],
+        # finality_branch=parsing.hex_to_bytes(finality_update['finality_branch']),
         sync_aggregate=parsing.parse_sync_aggregate(
             finality_update['sync_aggregate']),
         signature_slot=int(finality_update['signature_slot'])
@@ -222,14 +225,14 @@ async def main():
 
 if __name__ == "__main__":
     # assert py_ecc_bls.FastAggregateVerify([
-	# 		bytes.fromhex("a73eb991aa22cdb794da6fcde55a427f0a4df5a4a70de23a988b5e5fc8c4d844f66d990273267a54dd21579b7ba6a086"),
-	# 		bytes.fromhex("b29043a7273d0a2dbc2b747dcf6a5eccbd7ccb44b2d72e985537b117929bc3fd3a99001481327788ad040b4077c47c0d"),
-	# 		bytes.fromhex("b928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7"),
-	# 		bytes.fromhex("9446407bcd8e5efe9f2ac0efbfa9e07d136e68b03c5ebc5bde43db3b94773de8605c30419eb2596513707e4e7448bb50"),
-	# 	],
-	# 	bytes.fromhex("69241e7146cdcc5a5ddc9a60bab8f378c0271e548065a38bcc60624e1dbed97f"),
-	# 	bytes.fromhex("b204e9656cbeb79a9a8e397920fd8e60c5f5d9443f58d42186f773c6ade2bd263e2fe6dbdc47f148f871ed9a00b8ac8b17a40d65c8d02120c00dca77495888366b4ccc10f1c6daa02db6a7516555ca0665bca92a647b5f3a514fa083fdc53b6e")
-	# 	)
+    # 		bytes.fromhex("a73eb991aa22cdb794da6fcde55a427f0a4df5a4a70de23a988b5e5fc8c4d844f66d990273267a54dd21579b7ba6a086"),
+    # 		bytes.fromhex("b29043a7273d0a2dbc2b747dcf6a5eccbd7ccb44b2d72e985537b117929bc3fd3a99001481327788ad040b4077c47c0d"),
+    # 		bytes.fromhex("b928f3beb93519eecf0145da903b40a4c97dca00b21f12ac0df3be9116ef2ef27b2ae6bcd4c5bc2d54ef5a70627efcb7"),
+    # 		bytes.fromhex("9446407bcd8e5efe9f2ac0efbfa9e07d136e68b03c5ebc5bde43db3b94773de8605c30419eb2596513707e4e7448bb50"),
+    # 	],
+    # 	bytes.fromhex("69241e7146cdcc5a5ddc9a60bab8f378c0271e548065a38bcc60624e1dbed97f"),
+    # 	bytes.fromhex("b204e9656cbeb79a9a8e397920fd8e60c5f5d9443f58d42186f773c6ade2bd263e2fe6dbdc47f148f871ed9a00b8ac8b17a40d65c8d02120c00dca77495888366b4ccc10f1c6daa02db6a7516555ca0665bca92a647b5f3a514fa083fdc53b6e")
+    # 	)
 
     # my_hex = "d5722733abc981a2e933beb7b1d306ba201e6b3309e44f859a30ab45d85f6669"
     # my_bytes = bytes.fromhex(my_hex)

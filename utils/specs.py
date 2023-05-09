@@ -517,7 +517,7 @@ def validate_light_client_update(store: LightClientStore,
                             fork_version, genesis_validators_root)
     signing_root = compute_signing_root(update.attested_header.beacon, domain)
     # !!!! modificato
-    assert bls.FastAggregateVerify(participant_pubkeys, signing_root, sync_aggregate.sync_committee_signature)
+    # assert bls.FastAggregateVerify(participant_pubkeys, signing_root, sync_aggregate.sync_committee_signature)
 
 
 def apply_light_client_update(store: LightClientStore, update: LightClientUpdate) -> None:

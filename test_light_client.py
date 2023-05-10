@@ -219,9 +219,8 @@ async def main():
             sync(period, period)
 
         print("Polling next sync committee update in",
-              time_until_next_epoch(), " secs")
+              time_until_next_epoch(), "secs")
         await asyncio.sleep(time_until_next_epoch())
-
 
 if __name__ == "__main__":
     # assert py_ecc_bls.FastAggregateVerify([

@@ -230,6 +230,7 @@ class LightClientStore(object):
     current_max_active_participants: uint64
 
 
+# !!!! modificato
 def is_valid_merkle_branch(leaf: Bytes32, branch: Sequence[Bytes32], depth: uint64, index: uint64, root: Root) -> bool:
     """
     Check if ``leaf`` at ``index`` verifies against the Merkle ``root`` and ``branch``.
@@ -237,7 +238,7 @@ def is_valid_merkle_branch(leaf: Bytes32, branch: Sequence[Bytes32], depth: uint
     # value = leaf
     # for i in range(depth):
     #     if index // (2**i) % 2:
-    #         value = hash(branch[i] + value)
+            # value = hash(branch[i] + value)
     #     else:
     #         value = hash(value + branch[i])
     #         value

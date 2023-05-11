@@ -3,14 +3,14 @@ pragma solidity ^0.8.17;
 contract LightClient {
     uint8 constant CURRENT_SYNC_COMMITTEE_INDEX = 54;
     uint8 constant CURRENT_SYNC_COMMITTEE_INDEX_LOG_2 = 5;
-    uint8 constant EXECUTION_PAYLOAD_INDEX = 25;
+    uint256 constant EXECUTION_PAYLOAD_INDEX = 25;
     uint8 constant EXECUTION_PAYLOAD_INDEX_LOG_2 = 4;
     uint16 constant SYNC_COMMITTEE_SIZE = 512;
     uint16 constant BYTES_PER_LOGS_BLOOM = 256;
     uint8 constant SLOTS_PER_EPOCH = 32;
     uint32 constant CAPELLA_FORK_EPOCH = 194048;
-    uint constant NEXT_SYNC_COMMITTEE_INDEX_LOG_2 = 5;
-    uint constant FINALIZED_ROOT_INDEX_LOG_2 = 6;
+    uint256 constant NEXT_SYNC_COMMITTEE_INDEX_LOG_2 = 5;
+    uint256 constant FINALIZED_ROOT_INDEX_LOG_2 = 6;
 
     LightClientStore store;
 
@@ -36,7 +36,7 @@ contract LightClient {
 
     struct SyncAggregate {
         bool[SYNC_COMMITTEE_SIZE] syncCommitteeBits;
-        bytes syncCommitteeSignature; // should be bytes96
+        bytes32[3] syncCommitteeSignature; // should be bytes96
     }
 
     struct BeaconBlockHeader {
@@ -72,8 +72,8 @@ contract LightClient {
     }
 
     struct SyncCommittee {
-        bytes[SYNC_COMMITTEE_SIZE] pubkeys; // should be bytes48
-        bytes aggregatePubkey; // should be bytes48
+        bytes32[SYNC_COMMITTEE_SIZE][2] pubkeys; // should be bytes48
+        bytes32[2] aggregatePubkey; // should be bytes48
     }
 
     struct LightClientBootstrap {
@@ -88,105 +88,75 @@ contract LightClient {
 
     function isValidMerkleBranch(
         bytes32 leaf,
-        bytes32[] memory branch, //not sure about memory
+        bytes32[] memory branch,
         uint64 depth,
-        uint64 index,
+        uint256 index,
         bytes32 root
     ) private pure returns (bool) {
         bytes32 value = leaf;
         for (uint64 i = 0; i < depth; i++) {
-            if (((index / (2 ** i)) % 2) != 0) {
-                value = keccak256(abi.encodePacked(branch[i], value)); // or sha256?
+            if (((index / (2**i)) % 2) != 0) {
+                value = sha256(concat(branch[i], value));
             } else {
-                value = keccak256(abi.encodePacked(value, branch[i])); // or sha256?
+                value = sha256(concat(value, branch[i]));
             }
         }
         return value == root;
     }
 
-    function log2(uint64 x) private pure returns (uint64 y) {
-        assembly {
-            let arg := x
-            x := sub(x, 1)
-            x := or(x, div(x, 0x02))
-            x := or(x, div(x, 0x04))
-            x := or(x, div(x, 0x10))
-            x := or(x, div(x, 0x100))
-            x := or(x, div(x, 0x10000))
-            x := or(x, div(x, 0x100000000))
-            x := or(x, div(x, 0x10000000000000000))
-            x := or(x, div(x, 0x100000000000000000000000000000000))
-            x := add(x, 1)
-            let m := mload(0x40)
-            mstore(
-                m,
-                0xf8f9cbfae6cc78fbefe7cdc3a1793dfcf4f0e8bbd8cec470b6a28a7a5a3e1efd
-            )
-            mstore(
-                add(m, 0x20),
-                0xf5ecf1b3e9debc68e1d9cfabc5997135bfb7a7a3938b7b606b5b4b3f2f1f0ffe
-            )
-            mstore(
-                add(m, 0x40),
-                0xf6e4ed9ff2d6b458eadcdf97bd91692de2d4da8fd2d0ac50c6ae9a8272523616
-            )
-            mstore(
-                add(m, 0x60),
-                0xc8c0b887b0a8a4489c948c7f847c6125746c645c544c444038302820181008ff
-            )
-            mstore(
-                add(m, 0x80),
-                0xf7cae577eec2a03cf3bad76fb589591debb2dd67e0aa9834bea6925f6a4a2e0e
-            )
-            mstore(
-                add(m, 0xa0),
-                0xe39ed557db96902cd38ed14fad815115c786af479b7e83247363534337271707
-            )
-            mstore(
-                add(m, 0xc0),
-                0xc976c13bb96e881cb166a933a55e490d9d56952b8d4e801485467d2362422606
-            )
-            mstore(
-                add(m, 0xe0),
-                0x753a6d1b65325d0c552a4d1345224105391a310b29122104190a110309020100
-            )
-            mstore(0x40, add(m, 0x100))
-            let
-                magic
-            := 0x818283848586878898a8b8c8d8e8f929395969799a9b9d9e9faaeb6bedeeff
-            let
-                shift
-            := 0x100000000000000000000000000000000000000000000000000000000000000
-            let a := div(mul(x, magic), shift)
-            y := div(mload(add(m, sub(255, a))), shift)
-            y := add(
-                y,
-                mul(
-                    256,
-                    gt(
-                        arg,
-                        0x8000000000000000000000000000000000000000000000000000000000000000
-                    )
-                )
-            )
+    // taken from https://medium.com/coinmonks/math-in-solidity-part-5-exponent-and-logarithm-9aef8515136e
+    function log2(uint256 x) private pure returns (uint256 n) {
+        if (x >= 2**128) {
+            x >>= 128;
+            n += 128;
+        }
+        if (x >= 2**64) {
+            x >>= 64;
+            n += 64;
+        }
+        if (x >= 2**32) {
+            x >>= 32;
+            n += 32;
+        }
+        if (x >= 2**16) {
+            x >>= 16;
+            n += 16;
+        }
+        if (x >= 2**8) {
+            x >>= 8;
+            n += 8;
+        }
+        if (x >= 2**4) {
+            x >>= 4;
+            n += 4;
+        }
+        if (x >= 2**2) {
+            x >>= 2;
+            n += 2;
+        }
+        if (x >= 2**1) {
+            n += 1;
         }
     }
 
-    function getSubtreeIndex(
-        uint64 generalizedIndex
-    ) private pure returns (uint64) {
-        uint64 two = 2;
-        return (generalizedIndex % (two ** (log2(generalizedIndex))));
+    function getSubtreeIndex(uint256 generalizedIndex)
+        private
+        pure
+        returns (uint256)
+    {
+        return (generalizedIndex % (2**(log2(generalizedIndex))));
     }
 
-    function isEmptyExecutionPayloadHeader(
-        ExecutionPayloadHeader memory header // not sure about memory
-    ) private pure returns (bool) {
+    function isEmptyExecutionPayloadHeader(ExecutionPayloadHeader memory header)
+        private
+        pure
+        returns (bool)
+    {
         for (uint16 i = 0; i < BYTES_PER_LOGS_BLOOM; i++) {
             if (header.logsBloom[i] != "") return false;
         }
 
-        for (uint i = 0; i < header.extraData.length; i++) {
+        for (uint256 i = 0; i < header.extraData.length; i++) {
             if (header.extraData[i] != "") return false;
         }
 
@@ -205,18 +175,22 @@ contract LightClient {
             header.withdrawalsRoot == "");
     }
 
-    function isEmptyExecutionBranch(
-        bytes32[] memory executionBranch // not sure about memory
-    ) private pure returns (bool) {
+    function isEmptyExecutionBranch(bytes32[] memory executionBranch)
+        private
+        pure
+        returns (bool)
+    {
         for (uint8 i = 0; i < EXECUTION_PAYLOAD_INDEX_LOG_2; i++) {
             if (executionBranch[i] != 0) return false;
         }
         return true;
     }
 
-    function isValidLightCLientHeader(
-        LightClientHeader memory header
-    ) private pure returns (bool) {
+    function isValidLightCLientHeader(LightClientHeader memory header)
+        private
+        pure
+        returns (bool)
+    {
         uint64 epoch = computeEpochAtSlot(header.beacon.slot);
 
         if (epoch < CAPELLA_FORK_EPOCH) {
@@ -234,16 +208,131 @@ contract LightClient {
             );
     }
 
-    function hashTreeRoot(
-        BeaconBlockHeader memory header // not sure about memory
-    ) private view returns (bytes32) {
-        // ...
+    function hashTreeRoot(uint64 element) private view returns (bytes32) {}
+
+    bytes32[100] zeroHashes;
+
+    function concat(bytes32 b1, bytes32 b2)
+        private
+        pure
+        returns (bytes memory)
+    {
+        bytes memory result = new bytes(64);
+        assembly {
+            mstore(add(result, 32), b1)
+            mstore(add(result, 64), b2)
+        }
+        return result;
     }
 
-    function hashTreeRoot(
-        SyncCommittee memory syncCommittee // not sure about memory
-    ) private view returns (bytes32) {
-        // ...
+    function initZeroHashes() private {
+        for (uint256 layer = 1; layer < 100; layer++) {
+            zeroHashes[layer] = sha256(
+                concat(zeroHashes[layer - 1], zeroHashes[layer - 1])
+            );
+        }
+    }
+
+    function _merge_merkleize(
+        bytes32 h,
+        uint256 i,
+        uint256 count,
+        uint256 depth,
+        bytes32[] memory tmp
+    ) private view returns (uint256, bytes32) {
+        uint256 j;
+        while (true) {
+            if (i & (1 << j) == 0) {
+                if (i == count && j < depth) {
+                    h = sha256(concat(h, zeroHashes[j]));
+                } else {
+                    break;
+                }
+            } else {
+                h = sha256(concat(tmp[j], h));
+            }
+            j += 1;
+        }
+        return (j, h);
+    }
+
+    // Adapted from https://github.com/ethereum/consensus-specs/blob/v1.3.0/tests/core/pyspec/eth2spec/utils/merkle_minimal.py#L7
+    function merkleize(bytes32[] memory chunks) private view returns (bytes32) {
+        uint256 count = chunks.length;
+        if (count == 0) {
+            return zeroHashes[0];
+        }
+
+        uint256 depth = log2(count - 1);
+        bytes32[] memory tmp = new bytes32[](depth);
+
+        for (uint256 i = 0; i < count; i++) {
+            uint256 j;
+            bytes32 h;
+            (j, h) = _merge_merkleize(chunks[i], i, count, depth, tmp);
+            tmp[j] = h;
+        }
+
+        if (1 << depth != count) {
+            uint256 j;
+            bytes32 h;
+            (j, h) = _merge_merkleize(zeroHashes[0], count, count, depth, tmp);
+            tmp[j] = h;
+        }
+
+        return tmp[depth];
+    }
+
+    function toBytes(uint64 x) private pure returns (bytes32 b) {
+        assembly {
+            mstore(add(b, 32), x)
+        }
+    }
+
+    // https://eth2book.info/capella/part2/building_blocks/merkleization/
+    function hashTreeRoot(BeaconBlockHeader memory header)
+        private
+        view
+        returns (bytes32)
+    {
+        bytes32[] memory chunks = new bytes32[](5);
+        chunks[0] = toBytes(header.slot);
+        chunks[1] = toBytes(header.proposerIndex);
+        chunks[2] = header.parentRoot;
+        chunks[3] = header.stateRoot;
+        chunks[4] = header.bodyRoot;
+
+        return merkleize(chunks);
+    }
+
+    function hashTreeRoot(bytes32[SYNC_COMMITTEE_SIZE][2] memory pubkeys)
+        private
+        view
+        returns (bytes32)
+    {
+        bytes32[] memory chunks = new bytes32[](SYNC_COMMITTEE_SIZE);
+        for (uint256 i = 0; i < SYNC_COMMITTEE_SIZE; i++) {
+            chunks[i] = sha256(concat(pubkeys[i][0], pubkeys[i][1]));
+        }
+
+        return merkleize(chunks);
+    }
+
+    function hashTreeRoot(SyncCommittee memory syncCommittee)
+        private
+        view
+        returns (bytes32)
+    {
+        bytes32[] memory chunks = new bytes32[](2);
+        chunks[0] = hashTreeRoot(syncCommittee.pubkeys);
+        chunks[1] = sha256(
+            concat(
+                syncCommittee.aggregatePubkey[0],
+                syncCommittee.aggregatePubkey[1]
+            )
+        );
+
+        return merkleize(chunks);
     }
 
     function initializeLightClientStore(

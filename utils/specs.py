@@ -1,3 +1,7 @@
+"""
+This is a copy of part of the ethereum specs
+"""
+
 from dataclasses import (
     dataclass,
 )
@@ -230,7 +234,7 @@ class LightClientStore(object):
     current_max_active_participants: uint64
 
 
-# !!!! modificato
+# [LV] !!!! modificato
 def is_valid_merkle_branch(leaf: Bytes32, branch: Sequence[Bytes32], depth: uint64, index: uint64, root: Root) -> bool:
     """
     Check if ``leaf`` at ``index`` verifies against the Merkle ``root`` and ``branch``.
@@ -517,7 +521,7 @@ def validate_light_client_update(store: LightClientStore,
     domain = compute_domain(DOMAIN_SYNC_COMMITTEE,
                             fork_version, genesis_validators_root)
     signing_root = compute_signing_root(update.attested_header.beacon, domain)
-    # !!!! modificato
+    # [LV] !!!! modificato
     # assert bls.FastAggregateVerify(participant_pubkeys, signing_root, sync_aggregate.sync_committee_signature)
 
 

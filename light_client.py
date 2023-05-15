@@ -110,7 +110,6 @@ def bootstrap():
     Starting point of the synchronization process, it retrieves the light client bootstrap data and initializes the light client store
     """
     trusted_block_root = get_trusted_block_root()
-
     light_client_bootstrap = get_light_client_bootstrap(trusted_block_root)
 
     light_client_store = initialize_light_client_store(

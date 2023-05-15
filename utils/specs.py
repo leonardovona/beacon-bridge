@@ -6,6 +6,7 @@ from dataclasses import (
     dataclass,
 )
 
+from hashlib import sha256
 
 from utils.ssz.ssz_impl import hash_tree_root
 from utils.ssz.ssz_typing import (
@@ -239,15 +240,17 @@ def is_valid_merkle_branch(leaf: Bytes32, branch: Sequence[Bytes32], depth: uint
     """
     Check if ``leaf`` at ``index`` verifies against the Merkle ``root`` and ``branch``.
     """
-    # value = leaf
-    # for i in range(depth):
-    #     if index // (2**i) % 2:
-            # value = hash(branch[i] + value)
-    #     else:
-    #         value = hash(value + branch[i])
-    #         value
-    # return value == root
-    return True
+    value = leaf
+    for i in range(depth):
+        hash = sha256()
+        if index // (2**i) % 2:
+            hash.update(bytes.fromhex(str(branch[i])[2:]))
+            hash.update(bytes.fromhex(str(value)[2:]))
+        else:
+            hash.update(bytes.fromhex(str(value)[2:]))
+            hash.update(bytes.fromhex(str(branch[i])[2:]))
+        value = "0x" + hash.hexdigest()
+    return value == str(root)
 
 
 def compute_epoch_at_slot(slot: Slot) -> Epoch:

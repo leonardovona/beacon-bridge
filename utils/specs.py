@@ -514,8 +514,10 @@ def validate_light_client_update(store: LightClientStore,
     else:
         sync_committee = store.next_sync_committee
 
+    # bytes.fromhex(str(branch[i])[2:])
+    # modificato, non c'era bytes
     participant_pubkeys = [
-        pubkey for (bit, pubkey) in zip(sync_aggregate.sync_committee_bits, sync_committee.pubkeys)
+        bytes.fromhex(str(pubkey)[2:]) for (bit, pubkey) in zip(sync_aggregate.sync_committee_bits, sync_committee.pubkeys)
         if bit
     ]
     fork_version_slot = max(update.signature_slot, Slot(1)) - Slot(1)
@@ -525,7 +527,10 @@ def validate_light_client_update(store: LightClientStore,
                             fork_version, genesis_validators_root)
     signing_root = compute_signing_root(update.attested_header.beacon, domain)
     # [LV] !!!! modificato
-    # assert bls.FastAggregateVerify(participant_pubkeys, signing_root, sync_aggregate.sync_committee_signature)
+    # print(participant_pubkeys)
+    assert bls.FastAggregateVerify(participant_pubkeys, 
+                                   bytes.fromhex(str(signing_root)[2:]), 
+                                   bytes.fromhex(str(sync_aggregate.sync_committee_signature)[2:]))
 
 
 def apply_light_client_update(store: LightClientStore, update: LightClientUpdate) -> None:

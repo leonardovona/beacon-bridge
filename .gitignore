@@ -1,3 +1,6 @@
 .venv/
 .vscode/
 test_bls/
+
+__pycache__/
+*.py[cod]

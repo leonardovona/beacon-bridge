@@ -94,6 +94,7 @@ contract LightClient {
     }
 
     // Math utilities
+    // Computes ceil(log2(x))
     // taken from https://medium.com/coinmonks/math-in-solidity-part-5-exponent-and-logarithm-9aef8515136e
     function log2(uint256 x) private pure returns (uint256 n) {
         if (x >= 2**128) {
@@ -125,6 +126,10 @@ contract LightClient {
             n += 2;
         }
         if (x >= 2**1) {
+            x >>= 1;
+            n += 1;
+        }
+        if (x >= 2**0) {
             n += 1;
         }
     }
@@ -162,13 +167,14 @@ contract LightClient {
         uint64 depth,
         uint256 index,
         bytes32 root
-    ) private view returns (bool) {
+    ) private pure returns (bool) {
+        // Check if ``leaf`` at ``index`` verifies against the Merkle ``root`` and ``branch``.
         bytes32 value = leaf;
         for (uint64 i = 0; i < depth; i++) {
             if (((index / (2**i)) % 2) != 0) {
-                value = sha256(concat(branch[i], value));
+                value = sha256(abi.encodePacked(branch[i], value));
             } else {
-                value = sha256(concat(value, branch[i]));
+                value = sha256(abi.encodePacked(value, branch[i]));
             }
         }
 
@@ -222,9 +228,9 @@ contract LightClient {
         return true;
     }
 
-    function isValidLightCLientHeader(LightClientHeader memory header)
+    function isValidLightClientHeader(LightClientHeader memory header)
         private
-        view
+        pure
         returns (bool)
     {
         uint64 epoch = computeEpochAtSlot(header.beacon.slot);
@@ -244,66 +250,141 @@ contract LightClient {
             );
     }
 
-    function _merge_merkleize(
+
+    function merge(
         bytes32 h,
-        uint256 i,
-        uint256 count,
-        uint256 depth,
+        uint i,
+        uint count,
+        uint depth,
         bytes32[] memory tmp
-    ) private view returns (uint256, bytes32) {
-        uint256 j;
-        while (true) {
-            if (i & (1 << j) == 0) {
-                if ((i == count) && (j < depth)) {
-                    h = sha256(concat(h, zeroHashes[j]));
+    ) private view {
+        uint j = 0;
+        while(true){
+            if (i & (1 << j) == 0){
+                if (i == count && j < depth){
+                    h = sha256(abi.encodePacked(h, zeroHashes[j]));
                 } else {
                     break;
                 }
             } else {
-                h = sha256(concat(tmp[j], h));
+                h = sha256(abi.encodePacked(tmp[j], h));
             }
-            j += 1;
+            j++;
         }
 
-        // Added this check
-        if (j > depth) {
-            j = depth;
-        }
-        return (j, h);
+        // if (j > depth) {
+        //      j = depth;
+        // }
+        tmp[j] = h;
     }
 
-    // Adapted from https://github.com/ethereum/consensus-specs/blob/v1.3.0/tests/core/pyspec/eth2spec/utils/merkle_minimal.py#L7
-    function merkleize(bytes32[] memory chunks) private view returns (bytes32) {
-        uint256 count = chunks.length;
-        if (count == 0) {
+    function merkleize(
+        bytes32[] memory chunks,
+        uint limit
+    ) private view returns ( bytes32 ) {
+        uint count = chunks.length;
+
+        // if(count > limit) raise exception
+
+        if(limit == 0) {
             return zeroHashes[0];
         }
 
-        uint256 depth = log2(count - 1);
 
-        /*
-        if (depth == 0) {
-            depth++;
-        }
-        */
+        uint depth = log2(count - 1);
 
-        bytes32[] memory tmp = new bytes32[](depth + 1);
 
-        for (uint256 i = 0; i < count; i++) {
-            uint256 j;
-            bytes32 h;
-            (j, h) = _merge_merkleize(chunks[i], i, count, depth, tmp);
-            tmp[j] = h;
+        if(depth == 0) depth = 1;
+
+        uint max_depth = log2(limit - 1);
+
+        bytes32[] memory tmp = new bytes32[](max_depth + 1);
+
+        for(uint i = 0; i < count; i++) {
+            merge(chunks[i], i, count, depth, tmp);
         }
 
-        if (1 << depth != count) {
-            uint256 j;
-            bytes32 h;
-            (j, h) = _merge_merkleize(zeroHashes[0], count, count, depth, tmp);
-            tmp[j] = h;
+        if(1 << depth != count) {
+            merge(zeroHashes[0], count, count, depth, tmp);
         }
-        return tmp[depth];
+
+        for(uint j = depth; j < max_depth; j++){
+            tmp[j + 1] = sha256(abi.encodePacked(tmp[j], zeroHashes[j]));
+        }
+
+        return tmp[max_depth];
     }
+
+    // function _merge_merkleize(
+    //     bytes32 h,
+    //     uint256 i,
+    //     uint256 count,
+    //     uint256 depth,
+    //     bytes32[] memory tmp
+    // ) private view returns (uint256, bytes32) {
+    //     uint256 j;
+    //     console.log("h");
+    //     console.logBytes32(h);
+    //     console.log("i", i);
+    //     console.log("count", count);
+    //     console.log("depth", depth);
+    //     while (true) {
+    //         if (i & (1 << j) == 0) {
+    //             if ((i == count) && (j < depth)) {
+    //                 // If the number of chunks is not a power of two, pad with hash roots of empty trees
+    //                 h = sha256(concat(h, zeroHashes[j]));
+    //             } else {
+    //                 break;
+    //             }
+    //         } else {
+    //             h = sha256(concat(tmp[j], h));
+    //         }
+    //         j += 1;
+    //     }
+
+    //     // Added this check
+    //     if (j > depth) {
+    //         j = depth;
+    //     }
+    //     return (j, h);
+    // }
+
+    // // Adapted from https://github.com/ethereum/consensus-specs/blob/v1.3.0/tests/core/pyspec/eth2spec/utils/merkle_minimal.py#L7
+    // function merkleize(bytes32[] memory chunks) private view returns (bytes32) {
+    //     uint256 count = chunks.length;
+    //     if (count == 0) {
+    //         return zeroHashes[0];
+    //     }
+
+    //     uint256 depth = log2(count - 1);
+
+    //     // if (depth == 0) {
+    //     //    depth++;
+    //     // }
+
+    //     bytes32[] memory tmp = new bytes32[](depth + 1);
+
+    //     // Build the tree by merging leaf by leaf
+    //     for (uint256 i = 0; i < count; i++) {
+    //         uint256 j;
+    //         bytes32 h;
+    //         (j, h) = _merge_merkleize(chunks[i], i, count, depth, tmp);
+    //         tmp[j] = h;
+    //         console.log("tmp[j]");
+    //         console.logBytes32(tmp[j]);
+    //     }
+
+    //     if (1 << depth != count) {
+    //         console.log(count, " ", 1 << depth);
+    //         uint256 j;
+    //         bytes32 h;
+    //         (j, h) = _merge_merkleize(zeroHashes[0], count, count, depth, tmp);
+    //         tmp[j] = h;
+    //         console.log("tmp[j]");
+    //         console.logBytes32(tmp[j]);
+    //     }
+    //     return tmp[depth];
+    // }
 
     // https://ethereum.stackexchange.com/questions/83626/how-to-reverse-byte-order-in-uint256-or-bytes32
     function reverse(uint256 input) private pure returns (uint256 v) {
@@ -366,7 +447,7 @@ contract LightClient {
         chunks[3] = header.stateRoot;
         chunks[4] = header.bodyRoot;
 
-        return merkleize(chunks);
+        return merkleize(chunks, 5);
     }
 
     function hashTreeRoot(bytes memory pubkey) private pure returns (bytes32) {
@@ -392,11 +473,11 @@ contract LightClient {
     {
         bytes32[] memory chunks = new bytes32[](SYNC_COMMITTEE_SIZE);
         for (uint256 i = 0; i < SYNC_COMMITTEE_SIZE; i++) {
-            chunks[i] = hashTreeRoot(pubkeys[i]);
+            chunks[i] = sha256(abi.encodePacked(pubkeys[i], bytes16(0)));
         }
 
         //return chunks[0];
-        return merkleize(chunks);
+        return merkleize(chunks, SYNC_COMMITTEE_SIZE);
     }
 
     function hashTreeRoot(SyncCommittee memory syncCommittee)
@@ -414,10 +495,24 @@ contract LightClient {
             )
         );*/
 
-        return merkleize(chunks);
+        return merkleize(chunks, 2);
     }
 
     bytes32 bytes_slot;
+
+    function testHashTreeRootSyncCommittee(
+        bytes[SYNC_COMMITTEE_SIZE] memory pubkeys
+    ) external view {
+        
+        bytes32[] memory chunks = new bytes32[](SYNC_COMMITTEE_SIZE);
+        for(uint i = 0; i < SYNC_COMMITTEE_SIZE; i++) {
+            chunks[i] = sha256(abi.encodePacked(pubkeys[i], bytes16(0)));
+        }
+
+        //return chunks[0];
+
+        console.logBytes32(merkleize(chunks, SYNC_COMMITTEE_SIZE));
+    }
 
     function initializeLightClientStore_small(
         bytes[SYNC_COMMITTEE_SIZE] memory currentSyncCommitteePubKeys,
@@ -478,7 +573,7 @@ contract LightClient {
         bytes32 trustedBlockRoot,
         LightClientBootstrap memory bootstrap
     ) external {
-        require(isValidLightCLientHeader(bootstrap.header));
+        require(isValidLightClientHeader(bootstrap.header));
 
         require(hashTreeRoot(bootstrap.header.beacon) == trustedBlockRoot);
 

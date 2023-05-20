@@ -58,13 +58,13 @@ contract LightClient {
         bytes20 feeRecipient;
         bytes32 stateRoot;
         bytes32 receiptsRoot;
-        bytes1[BYTES_PER_LOGS_BLOOM] logsBloom;
+        bytes logsBloom; // BYTES_PER_LOGS_BLOOM len
         bytes32 prevRandao;
         uint64 blockNumber;
         uint64 gasLimit;
         uint64 gasUsed;
         uint64 timestamp;
-        bytes1[] extraData;
+        bytes extraData;
         uint256 baseFeePerGas;
         bytes32 blockHash;
         bytes32 transactionsRoot;
@@ -94,9 +94,45 @@ contract LightClient {
     }
 
     // Math utilities
+     // Computes ceil(log2(x))
+    // taken from https://medium.com/coinmonks/math-in-solidity-part-5-exponent-and-logarithm-9aef8515136e
+    function floorLog2(uint256 x) private pure returns (uint256 n) {
+        if (x >= 2**128) {
+            x >>= 128;
+            n += 128;
+        }
+        if (x >= 2**64) {
+            x >>= 64;
+            n += 64;
+        }
+        if (x >= 2**32) {
+            x >>= 32;
+            n += 32;
+        }
+        if (x >= 2**16) {
+            x >>= 16;
+            n += 16;
+        }
+        if (x >= 2**8) {
+            x >>= 8;
+            n += 8;
+        }
+        if (x >= 2**4) {
+            x >>= 4;
+            n += 4;
+        }
+        if (x >= 2**2) {
+            x >>= 2;
+            n += 2;
+        }
+        if (x >= 2**1) {
+            n += 1;
+        }
+    }
+
     // Computes ceil(log2(x))
     // taken from https://medium.com/coinmonks/math-in-solidity-part-5-exponent-and-logarithm-9aef8515136e
-    function log2(uint256 x) private pure returns (uint256 n) {
+    function ceilLog2(uint256 x) private pure returns (uint256 n) {
         if (x >= 2**128) {
             x >>= 128;
             n += 128;
@@ -186,7 +222,7 @@ contract LightClient {
         pure
         returns (uint256)
     {
-        return (generalizedIndex % (2**(log2(generalizedIndex))));
+        return (generalizedIndex % (2**(floorLog2(generalizedIndex))));
     }
 
     function isEmptyExecutionPayloadHeader(ExecutionPayloadHeader memory header)
@@ -230,7 +266,7 @@ contract LightClient {
 
     function isValidLightClientHeader(LightClientHeader memory header)
         private
-        pure
+        view
         returns (bool)
     {
         uint64 epoch = computeEpochAtSlot(header.beacon.slot);
@@ -242,7 +278,7 @@ contract LightClient {
 
         return
             isValidMerkleBranch(
-                header.execution.blockHash, // was getLcExecutionRoot
+                hashTreeRoot(header.execution), // was getLcExecutionRoot
                 header.executionBranch,
                 EXECUTION_PAYLOAD_INDEX_LOG_2,
                 getSubtreeIndex(EXECUTION_PAYLOAD_INDEX),
@@ -291,12 +327,12 @@ contract LightClient {
         }
 
 
-        uint depth = log2(count - 1);
+        uint depth = ceilLog2(count - 1);
 
 
         if(depth == 0) depth = 1;
 
-        uint max_depth = log2(limit - 1);
+        uint max_depth = ceilLog2(limit - 1);
 
         bytes32[] memory tmp = new bytes32[](max_depth + 1);
 
@@ -450,7 +486,7 @@ contract LightClient {
         return merkleize(chunks, 5);
     }
 
-    function hashTreeRoot(bytes memory pubkey) private pure returns (bytes32) {
+    /*function hashTreeRoot(bytes memory pubkey) private pure returns (bytes32) {
         bytes32[] memory chunks = new bytes32[](2);
 
         bytes32 temp;
@@ -464,7 +500,7 @@ contract LightClient {
         chunks[1] = temp;
 
         return sha256(concat(chunks[0], chunks[1]));
-    }
+    }*/
 
     function hashTreeRoot(bytes[SYNC_COMMITTEE_SIZE] memory pubkeys)
         private
@@ -487,7 +523,7 @@ contract LightClient {
     {
         bytes32[] memory chunks = new bytes32[](2);
         chunks[0] = hashTreeRoot(syncCommittee.pubkeys);
-        chunks[1] = sha256(syncCommittee.aggregatePubkey);
+        chunks[1] = sha256(abi.encodePacked(syncCommittee.aggregatePubkey, bytes16(0)));
         /*chunks[1] = sha256(
             concat(
                 syncCommittee.aggregatePubkey[0],
@@ -498,9 +534,75 @@ contract LightClient {
         return merkleize(chunks, 2);
     }
 
-    bytes32 bytes_slot;
+    /*
+    struct BeaconBlockHeader {
+        uint64 slot;
+        uint64 proposerIndex;
+        bytes32 parentRoot;
+        bytes32 stateRoot;
+        bytes32 bodyRoot;
+    }
 
-    function testHashTreeRootSyncCommittee(
+    struct ExecutionPayloadHeader {
+
+        bytes logsBloom; // BYTES_PER_LOGS_BLOOM len
+        bytes32 prevRandao;
+        uint64 blockNumber;
+        uint64 gasLimit;
+        uint64 gasUsed;
+        uint64 timestamp;
+        bytes extraData;
+        uint256 baseFeePerGas;
+        bytes32 blockHash;
+        bytes32 transactionsRoot;
+        bytes32 withdrawalsRoot;
+    }
+    */
+
+
+    function hashTreeRoot(ExecutionPayloadHeader memory header) 
+        private 
+        view
+        returns ( bytes32 ) {
+
+        bytes32[] memory chunks = new bytes32[](15);
+        chunks[0] = header.parentHash;
+        chunks[1] = bytes32(abi.encodePacked(header.feeRecipient, bytes12(0))); //not sure
+        chunks[2] = header.stateRoot;
+        chunks[3] = header.receiptsRoot;
+
+        bytes32[] memory chunksLogsBloom = new bytes32[](256 / 32);
+        for(uint i = 0; i < (256 / 32); i++){
+            bytes memory temp = new bytes(32);
+            for(uint j = 0; j < 32; j++) {
+                temp[j] = header.logsBloom[i*32 + j];
+            }
+            chunksLogsBloom[i] = bytes32(temp); 
+        }
+        chunks[4] = merkleize(chunksLogsBloom, 256 / 32);
+        
+        chunks[5] = header.prevRandao;
+        chunks[6] = toBytes(header.blockNumber);
+        chunks[7] = toBytes(header.gasLimit);
+        chunks[8] = toBytes(header.gasUsed);
+        chunks[9] = toBytes(header.timestamp);
+
+        bytes32[] memory chunksExtraData = new bytes32[](2);
+        chunksExtraData[0] = bytes32(abi.encodePacked(header.extraData, new bytes(32 - header.extraData.length)));
+        chunksExtraData[1] = bytes32(reverse(header.extraData.length));
+        chunks[10] = merkleize(chunksExtraData, 2);
+
+        chunks[11] = bytes32(reverse(header.baseFeePerGas));
+        chunks[12] = header.blockHash;
+        chunks[13] = header.transactionsRoot;
+        chunks[14] = header.withdrawalsRoot;
+
+        return merkleize(chunks, 15);
+    }
+
+    //bytes32 bytes_slot;
+
+    /*function testHashTreeRootSyncCommittee(
         bytes[SYNC_COMMITTEE_SIZE] memory pubkeys
     ) external view {
         
@@ -512,6 +614,85 @@ contract LightClient {
         //return chunks[0];
 
         console.logBytes32(merkleize(chunks, SYNC_COMMITTEE_SIZE));
+    }*/
+
+    /*
+
+    struct LightClientHeader {
+        BeaconBlockHeader beacon;
+        ExecutionPayloadHeader execution;
+        bytes32[] executionBranch; // should be fixed to EXECUTION_PAYLOAD_INDEX_LOG_2
+    
+      struct BeaconBlockHeader {
+        uint64 slot;
+        uint64 proposerIndex;
+        bytes32 parentRoot;
+        bytes32 stateRoot;
+        bytes32 bodyRoot;
+    }
+
+    struct ExecutionPayloadHeader {
+        bytes32 parentHash;
+        bytes20 feeRecipient;
+        bytes32 stateRoot;
+        bytes32 receiptsRoot;
+        bytes1[BYTES_PER_LOGS_BLOOM] logsBloom;
+        bytes32 prevRandao;
+        uint64 blockNumber;
+        uint64 gasLimit;
+        uint64 gasUsed;
+        uint64 timestamp;
+        bytes1[] extraData;
+        uint256 baseFeePerGas;
+        bytes32 blockHash;
+        bytes32 transactionsRoot;
+        bytes32 withdrawalsRoot;
+    }
+    */
+
+    function testIsValidLightClientHeader(
+        //LightClientHeader
+        //BeaconBlockHeader
+        BeaconBlockHeader memory beacon,
+        //ExecutionPayloadHeader
+        ExecutionPayloadHeader memory execution,
+        //executionBranch
+        bytes32[] memory executionBranch
+    ) external view {
+        LightClientHeader memory header;
+        header.beacon = beacon;
+        header.execution = execution;
+        header.executionBranch = executionBranch;
+        require(isValidLightClientHeader(header));
+    }
+
+    function testTrustedBlockRoot(
+        bytes32 trustedBlockRoot,
+        BeaconBlockHeader memory beacon
+    ) external view {
+        require(hashTreeRoot(beacon) == trustedBlockRoot);
+    }
+
+    function testIsValidMerkleBranch(
+        bytes[SYNC_COMMITTEE_SIZE] memory pubkeys,
+        bytes memory aggregatePubkey,
+        bytes32[] memory currentSyncCommitteeBranch,
+        bytes32 stateRoot
+    ) external view {
+        SyncCommittee memory currentSyncCommittee;
+
+        currentSyncCommittee.pubkeys = pubkeys;
+        currentSyncCommittee.aggregatePubkey = aggregatePubkey;
+
+        require(
+            isValidMerkleBranch(
+                hashTreeRoot(currentSyncCommittee),
+                currentSyncCommitteeBranch,
+                CURRENT_SYNC_COMMITTEE_INDEX_LOG_2,
+                getSubtreeIndex(CURRENT_SYNC_COMMITTEE_INDEX),
+                stateRoot
+            )
+        );
     }
 
     function initializeLightClientStore_small(
@@ -520,12 +701,36 @@ contract LightClient {
         bytes32[] memory currentSyncCommitteeBranch,
         bytes32 stateRoot //bytes32 trustedBlockRoot, //BeaconBlockHeader memory bbh
     ) external view {
-        //require(hashTreeRoot(bbh) == trustedBlockRoot);
-        SyncCommittee memory currentSyncCommittee;
-        currentSyncCommittee.pubkeys = currentSyncCommitteePubKeys;
-        currentSyncCommittee.aggregatePubkey = currentSyncCommitteeAggregate;
 
-        console.logBytes32(hashTreeRoot(currentSyncCommitteePubKeys));
+        //require(isValidLightClientHeader(bootstrap.header));
+
+/*
+        require(hashTreeRoot(bootstrap.header.beacon) == trustedBlockRoot);
+
+        require(
+            isValidMerkleBranch(
+                hashTreeRoot(bootstrap.currentSyncCommittee),
+                bootstrap.currentSyncCommitteeBranch,
+                CURRENT_SYNC_COMMITTEE_INDEX_LOG_2,
+                getSubtreeIndex(CURRENT_SYNC_COMMITTEE_INDEX),
+                bootstrap.header.beacon.stateRoot
+            )
+        );
+
+        store.finalizedHeader = bootstrap.header;
+        store.currentSyncCommittee = bootstrap.currentSyncCommittee;
+        store.optimisticHeader = bootstrap.header;
+*/
+
+//
+
+        //require(hashTreeRoot(bbh) == trustedBlockRoot);
+        // SyncCommittee memory currentSyncCommittee;
+        // currentSyncCommittee.pubkeys = currentSyncCommitteePubKeys;
+        // currentSyncCommittee.aggregatePubkey = currentSyncCommitteeAggregate;
+
+
+        // console.logBytes32(hashTreeRoot(currentSyncCommitteePubKeys));
         //console.logBytes32(hashTreeRoot(currentSyncCommitteePubKeys[0]));
         /*
         bytes memory temp = new bytes(32);
@@ -567,6 +772,53 @@ contract LightClient {
         //        stateRoot
         //    )
         //);
+    }
+
+    function testInitializeLightClientStore(
+        //LightClientHeader
+        //BeaconBlockHeader
+        BeaconBlockHeader memory beacon,
+        //ExecutionPayloadHeader
+        ExecutionPayloadHeader memory execution,
+        //ExecutionBranch
+        bytes32[] memory executionBranch,
+        //
+        bytes32 trustedBlockRoot,
+        //
+        //CurrentSyncCommittee
+        bytes[SYNC_COMMITTEE_SIZE] memory pubkeys,
+        bytes memory aggregatePubkey,
+        //
+        bytes32[] memory currentSyncCommitteeBranch
+    ) external {
+        LightClientHeader memory header;
+        header.beacon = beacon;
+        header.execution = execution;
+        header.executionBranch = executionBranch;
+
+        SyncCommittee memory currentSyncCommittee;
+        currentSyncCommittee.pubkeys = pubkeys;
+        currentSyncCommittee.aggregatePubkey = aggregatePubkey;
+
+        require(isValidLightClientHeader(header));
+
+        require(hashTreeRoot(beacon) == trustedBlockRoot);
+
+        require(
+            isValidMerkleBranch(
+                hashTreeRoot(currentSyncCommittee),
+                currentSyncCommitteeBranch,
+                CURRENT_SYNC_COMMITTEE_INDEX_LOG_2,
+                getSubtreeIndex(CURRENT_SYNC_COMMITTEE_INDEX),
+                header.beacon.stateRoot
+            )
+        );
+
+        store.finalizedHeader = header;
+        store.currentSyncCommittee = currentSyncCommittee;
+        store.optimisticHeader = header;
+
+        console.log("ok!");
     }
 
     function initializeLightClientStore(

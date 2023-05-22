@@ -307,9 +307,18 @@ from utils.specs import BeaconBlockHeader, ExecutionPayloadHeader, ExecutionAddr
 
 from utils.ssz.ssz_typing import ByteVector, Bytes32, uint64, ByteList, uint256
 
+import hashlib
+
 if __name__ == "__main__":
     asyncio.run(main())
 
+    # zeroHashes = []
+    # zeroHashes.append(Hash32(b'\x00'*32))
+    # for i in range(1, 100):
+    #     zeroHashes.append(Hash32(hashlib.sha256(zeroHashes[i - 1] + zeroHashes[i - 1]).hexdigest()))
+
+    # for i in range(100):
+    #     print(zeroHashes[i])
     """
     The following code is used to test bls signature verification, ignore it
     """

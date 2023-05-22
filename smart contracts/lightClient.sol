@@ -535,7 +535,7 @@ contract LightClient {
         bool oldHasSupermajority = oldNumActiveParticipants * 3 >= maxActiveParticipants * 2;
 
         if ( newHasSupermajority != oldHasSupermajority) {
-            return newHasSupermajority > oldHasSupermajority;
+            return newHasSupermajority && !oldHasSupermajority;
         }
         if(!newHasSupermajority && newNumActiveParticipants != oldNumActiveParticipants) {
             return newNumActiveParticipants > oldNumActiveParticipants;
@@ -554,6 +554,47 @@ contract LightClient {
         if(newHasFinality != oldHasFinality) {
             return newHasFinality;
         }
+
+        if ( newHasFinality ) {
+            bool newHasSyncCommitteeFinality = (Utils.computeSyncCommitteePeriodAtSlot(newUpdate.finalizedHeader.beacon.slot) == Utils.computeSyncCommitteePeriodAtSlot(newUpdate.attestedHeader.beacon.slot));
+            bool oldHasSyncCommitteeFinality = (Utils.computeSyncCommitteePeriodAtSlot(oldUpdate.finalizedHeader.beacon.slot) == Utils.computeSyncCommitteePeriodAtSlot(oldUpdate.attestedHeader.beacon.slot));
+            if(newHasSyncCommitteeFinality != oldHasSyncCommitteeFinality) {
+                return newHasSyncCommitteeFinality;
+            }
+        }
+
+        if (newNumActiveParticipants != oldNumActiveParticipants) {
+            return newNumActiveParticipants > oldNumActiveParticipants;
+        }
+
+        if(newUpdate.attestedHeader.beacon.slot != oldUpdate.attestedHeader.beacon.slot){
+            return newUpdate.attestedHeader.beacon.slot < oldUpdate.attestedHeader.beacon.slot;
+        }
+
+        return newUpdate.signatureSlot < oldUpdate.signatureSlot;
+    }
+
+    function applyLightClientUpdate(
+        Structs.LightClientUpdate memory update
+    ) private {
+        uint64 storePeriod = Utils.computeSyncCommitteePeriodAtSlot(store.finalizedHeader.beacon.slot);
+        uint64 updateFinalizedPeriod = Utils.computeSyncCommitteePeriodAtSlot(update.finalizedHeader.beacon.slot);
+
+        if(!isNextSyncCommitteeKnown()){
+            require(updateFinalizedPeriod == storePeriod);
+            store.nextSyncCommittee = update.nextSyncCommittee;
+        } else if(updateFinalizedPeriod == storePeriod + 1) {
+            store.currentSyncCommittee = store.nextSyncCommittee;
+            store.nextSyncCommittee = update.nextSyncCommittee;
+            store.previousMaxActiveParticipants = store.currentMaxActiveParticipants;
+            store.currentMaxActiveParticipants = 0;
+        }
+        if(update.finalizedHeader.beacon.slot > store.finalizedHeader.beacon.slot) {
+            store.finalizedHeader = update.finalizedHeader;
+            if(store.finalizedHeader.beacon.slot > store.optimisticHeader.beacon.slot) {
+                store.optimisticHeader = store.finalizedHeader;
+            }
+        }
     }
 
     function processLightClientUpdate(
@@ -563,7 +604,7 @@ contract LightClient {
     ) external {
         validateLightClientUpdate(update, currentSlot, genesisValidatorsRoot);
 
-        bool[SYNC_COMMITTEE_SIZE] syncCommitteeBits = update
+        bool[SYNC_COMMITTEE_SIZE] memory syncCommitteeBits = update
             .syncAggregate
             .syncCommitteeBits;
 
@@ -573,6 +614,44 @@ contract LightClient {
             isBetterUpdate(update, store.bestValidUpdate)
         ) {
             store.bestValidUpdate = update;
+        }
+
+        uint64 currentParticipants;
+        for (
+            uint256 i = 0;
+            i < SYNC_COMMITTEE_SIZE;
+            i++
+        ) {
+            if (syncCommitteeBits[i]) {
+                currentParticipants++;
+            }
+        }
+
+        store.currentMaxActiveParticipants = (store.currentMaxActiveParticipants > currentParticipants ? store.currentMaxActiveParticipants : currentParticipants);
+
+        uint64 safetyThreshold = (store.previousMaxActiveParticipants > store.currentMaxActiveParticipants ? store.previousMaxActiveParticipants : store.currentMaxActiveParticipants) / 2;
+        
+        if(currentParticipants > safetyThreshold && update.attestedHeader.beacon.slot > store.optimisticHeader.beacon.slot) {
+            store.optimisticHeader = update.attestedHeader;
+        }
+
+        bool updateHasFinalizedNextSyncCommittee = (
+            !isNextSyncCommitteeKnown() &&
+            isSyncCommitteeUpdate(update) &&
+            isFinalityUpdate(update) &&
+            (Utils.computeSyncCommitteePeriodAtSlot(update.finalizedHeader.beacon.slot) == Utils.computeSyncCommitteePeriodAtSlot(update.attestedHeader.beacon.slot))
+        );
+
+        if (
+            currentParticipants * 3 >= SYNC_COMMITTEE_SIZE * 2 &&
+            (
+                update.finalizedHeader.beacon.slot > store.finalizedHeader.beacon.slot ||
+                updateHasFinalizedNextSyncCommittee
+            )
+        ) {
+            applyLightClientUpdate(update);
+            Structs.LightClientUpdate memory emptyLightClientUpdate;
+            store.bestValidUpdate = emptyLightClientUpdate;
         }
     }
 }

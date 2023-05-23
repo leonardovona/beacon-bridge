@@ -1,6 +1,6 @@
 .venv/
 .vscode/
-test_bls/
+test/
 
 __pycache__/
 *.py[cod]

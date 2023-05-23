@@ -1,6 +1,6 @@
 pragma solidity ^0.8.17;
 
-import { SLOTS_PER_EPOCH, EPOCHS_PER_SYNC_COMMITTEE_PERIOD } from "./constants.sol";
+import "./constants.sol";
 
 library Utils {
     // Math utilities
@@ -111,6 +111,5 @@ library Utils {
         uint64 slot
     ) public pure returns (uint64) {
         return computeSyncCommitteePeriod(computeEpochAtSlot(slot));
-    }
-    
+    }  
 }

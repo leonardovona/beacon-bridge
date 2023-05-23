@@ -26,7 +26,7 @@ library Structs {
 
     struct SyncAggregate {
         bool[SYNC_COMMITTEE_SIZE] syncCommitteeBits;
-        bytes32[3] syncCommitteeSignature; // should be bytes96
+        bytes syncCommitteeSignature; // should be bytes96
     }
 
     struct BeaconBlockHeader {

@@ -44,6 +44,8 @@ from utils.ssz.ssz_impl import hash_tree_root
 # clock is the package that contains the functions to manage the chain time
 from utils.clock import get_current_slot, time_until_next_epoch
 
+from utils.to_string import light_client_bootstrap_to_string, light_client_update_to_string
+
 # Takes into account possible clock drifts. The low value provides protection against a server sending updates too far in the future
 MAX_CLOCK_DISPARITY_SEC = 10
 
@@ -117,17 +119,15 @@ def bootstrap():
     trusted_block_root = get_trusted_block_root()
     light_client_bootstrap = get_light_client_bootstrap(trusted_block_root)
 
-    print(trusted_block_root)
-
-    print(light_client_bootstrap)
-
-    for pubkey in light_client_bootstrap.current_sync_committee.pubkeys:
-        print(pubkey)
+    with open("./test/trusted_block_root.txt", "w") as f:
+        f.write(str(trusted_block_root))
+    
+    with open("./test/light_client_bootstrap.txt", "w") as f:
+        f.write(light_client_bootstrap_to_string(light_client_bootstrap))
 
     light_client_store = initialize_light_client_store(
         trusted_block_root, light_client_bootstrap)
     
-    exit()
     return light_client_store
 
 
@@ -254,11 +254,20 @@ def sync(light_client_store, last_period, current_period):
         count = to_period + 1 - from_period
         updates = updates_for_period(from_period, count)
         updates = parsing.parse_light_client_updates(updates)
+
+        i = 0
+        with open("./test/genesis_validators_root", "w") as f:
+            f.write(str(genesis_validators_root))
         for update in updates:
+            with open("./test/light_client_update_" + str(i) + ".txt", "w") as f:
+                f.write(light_client_update_to_string(update))
+            with open("./test/current_slot_" + str(i) + ".txt", "w") as f:
+                f.write(str(get_current_slot(tolerance=MAX_CLOCK_DISPARITY_SEC)))
+            i += 1
             print("Processing update")
             process_light_client_update(light_client_store, update, get_current_slot(
                 tolerance=MAX_CLOCK_DISPARITY_SEC), genesis_validators_root)
-
+    
 
 async def main():
     """

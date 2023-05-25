@@ -1,5 +1,8 @@
+setuptools
 py_ecc
 py_arkworks_bls12381
 milagro_bls_binding
 requests
 remerkleable
+web3[tester]
+py-solc-x

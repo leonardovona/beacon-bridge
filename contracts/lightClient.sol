@@ -1,7 +1,7 @@
 pragma solidity ^0.8.17;
 pragma experimental ABIEncoderV2;
 
-import "hardhat/console.sol";
+//import "hardhat/console.sol";
 import "./constants.sol";
 import "./structs.sol";
 import "./utils.sol";
@@ -496,5 +496,9 @@ contract LightClient {
             Structs.LightClientUpdate memory emptyLightClientUpdate;
             store.bestValidUpdate = emptyLightClientUpdate;
         }
+    }
+
+    function getStore() external view returns (bytes32) {
+        return store.finalizedHeader.beacon.stateRoot;
     }
 }

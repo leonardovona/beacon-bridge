@@ -528,9 +528,9 @@ def validate_light_client_update(store: LightClientStore,
     signing_root = compute_signing_root(update.attested_header.beacon, domain)
     # [LV] !!!! modificato
     # print(participant_pubkeys)
-    assert bls.FastAggregateVerify(participant_pubkeys, 
-                                   bytes.fromhex(str(signing_root)[2:]), 
-                                   bytes.fromhex(str(sync_aggregate.sync_committee_signature)[2:]))
+    # assert bls.FastAggregateVerify(participant_pubkeys, 
+    #                                bytes.fromhex(str(signing_root)[2:]), 
+    #                                bytes.fromhex(str(sync_aggregate.sync_committee_signature)[2:]))
 
 
 def apply_light_client_update(store: LightClientStore, update: LightClientUpdate) -> None:

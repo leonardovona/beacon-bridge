@@ -63,13 +63,13 @@ def sync_aggregate_to_string(aggregate: SyncAggregate):
     res += "["
     for i in range(len(aggregate.sync_committee_bits) - 1):
         if(aggregate.sync_committee_bits[i]):
-            res += "true,"
+            res += "True,"
         else:
-            res += "false,"
+            res += "False,"
     if(aggregate.sync_committee_bits[len(aggregate.sync_committee_bits) - 1]):
-        res += "true"
+        res += "True"
     else:
-        res += "false"
+        res += "False"
     res += "],"
     res += "\"" + str(aggregate.sync_committee_signature) + "\""
     res += "]"

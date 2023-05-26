@@ -12,22 +12,13 @@ contract LightClient {
     Structs.LightClientStore store;
     Merkleize merkleize;
 
-    constructor() {
-        merkleize = new Merkleize();
+    constructor() { merkleize = new Merkleize(); }
+
+    function getSubtreeIndex(uint256 generalizedIndex) private pure returns (uint256) {
+        return (generalizedIndex % (2**(Utils.log2({x: generalizedIndex, ceil: false}))));
     }
 
-    function getSubtreeIndex(uint256 generalizedIndex)
-        private
-        pure
-        returns (uint256)
-    {
-        return (generalizedIndex %
-            (2**(Utils.log2({x: generalizedIndex, ceil: false}))));
-    }
-
-    function isEmptyExecutionPayloadHeader(
-        Structs.ExecutionPayloadHeader memory header
-    ) private pure returns (bool) {
+    function isEmptyExecutionPayloadHeader(Structs.ExecutionPayloadHeader memory header) private pure returns (bool) {
         for (uint16 i = 0; i < BYTES_PER_LOGS_BLOOM; i++) {
             if (header.logsBloom[i] != "") return false;
         }
@@ -51,11 +42,7 @@ contract LightClient {
             header.withdrawalsRoot == "");
     }
 
-    function isEmptyExecutionBranch(bytes32[] memory executionBranch)
-        private
-        pure
-        returns (bool)
-    {
+    function isEmptyExecutionBranch(bytes32[] memory executionBranch) private pure returns (bool) {
         for (uint8 i = 0; i < EXECUTION_PAYLOAD_INDEX_LOG_2; i++) {
             if (executionBranch[i] != 0) return false;
         }
@@ -82,21 +69,16 @@ contract LightClient {
         return value == root;
     }
 
-    function isValidLightClientHeader(Structs.LightClientHeader memory header)
-        private
-        view
-        returns (bool)
-    {
+    function isValidLightClientHeader(Structs.LightClientHeader memory header) private view returns (bool) {
         uint64 epoch = Utils.computeEpochAtSlot(header.beacon.slot);
 
         if (epoch < CAPELLA_FORK_EPOCH) {
-            return (isEmptyExecutionPayloadHeader(header.execution) &&
-                isEmptyExecutionBranch(header.executionBranch));
+            return (isEmptyExecutionPayloadHeader(header.execution) && isEmptyExecutionBranch(header.executionBranch));
         }
 
         return
             isValidMerkleBranch(
-                merkleize.hashTreeRoot(header.execution), // was getLcExecutionRoot
+                merkleize.hashTreeRoot(header.execution),
                 header.executionBranch,
                 EXECUTION_PAYLOAD_INDEX_LOG_2,
                 getSubtreeIndex(EXECUTION_PAYLOAD_INDEX),
@@ -104,10 +86,7 @@ contract LightClient {
             );
     }
 
-    function initializeLightClientStore(
-        Structs.LightClientBootstrap memory bootstrap,
-        bytes32 trustedBlockRoot
-    ) external {
+    function initializeLightClientStore(Structs.LightClientBootstrap memory bootstrap, bytes32 trustedBlockRoot) external {
         // Validate bootstrap
         require(isValidLightClientHeader(bootstrap.header));
 
@@ -132,35 +111,20 @@ contract LightClient {
     // Not sure if this check is correct. There is for sure a better way to do this
     function isNextSyncCommitteeKnown() private view returns (bool) {
         Structs.SyncCommittee memory emptySyncCommittee;
-        return
-            keccak256(store.nextSyncCommittee.aggregatePubkey) !=
-            keccak256(emptySyncCommittee.aggregatePubkey);
-        //return keccak256(abi.encode(store.nextSyncCommittee.pubkeys)) != keccak256(abi.encode(emptySyncCommittee.pubkeys));
+        return keccak256(store.nextSyncCommittee.aggregatePubkey) != keccak256(emptySyncCommittee.aggregatePubkey);
     }
 
     // Not sure if it is correct
-    function isSyncCommitteeUpdate(Structs.LightClientUpdate memory update)
-        private
-        pure
-        returns (bool)
-    {
+    function isSyncCommitteeUpdate(Structs.LightClientUpdate memory update) private pure returns (bool) {
         for (uint256 i = 0; i < NEXT_SYNC_COMMITTEE_INDEX_LOG_2; i++) {
-            if (update.nextSyncCommitteeBranch[i] != bytes32(0)) {
-                return true;
-            }
+            if (update.nextSyncCommitteeBranch[i] != bytes32(0)) { return true; }
         }
         return false;
     }
 
-    function isFinalityUpdate(Structs.LightClientUpdate memory update)
-        private
-        pure
-        returns (bool)
-    {
+    function isFinalityUpdate(Structs.LightClientUpdate memory update) private pure returns (bool) {
         for (uint256 i = 0; i < FINALIZED_ROOT_INDEX_LOG_2; i++) {
-            if (update.finalityBranch[i] != bytes32(0)) {
-                return true;
-            }
+            if (update.finalityBranch[i] != bytes32(0)) { return true; }
         }
         return false;
     }
@@ -172,11 +136,7 @@ contract LightClient {
         return GENESIS_FORK_VERSION;
     }
 
-    function computeDomain(bytes4 forkVersion, bytes32 genesisValidatorsRoot)
-        private
-        view
-        returns (bytes32)
-    {
+    function computeDomain(bytes4 forkVersion, bytes32 genesisValidatorsRoot) private view returns (bytes32) {
         //not sure
         bytes32[] memory chunks = new bytes32[](2);
         chunks[0] = bytes32(abi.encodePacked(forkVersion, bytes28(0)));
@@ -189,16 +149,11 @@ contract LightClient {
         domain[0] = DOMAIN_SYNC_COMMITTEE[1];
         domain[0] = DOMAIN_SYNC_COMMITTEE[2];
         domain[0] = DOMAIN_SYNC_COMMITTEE[3];
-        for (uint256 i = 4; i < 32; i++) {
-            domain[i] = forkDataRoot[i];
-        }
+        for (uint256 i = 4; i < 32; i++) { domain[i] = forkDataRoot[i]; }
         return bytes32(domain);
     }
 
-    function computeSigningRoot(
-        Structs.BeaconBlockHeader memory beacon,
-        bytes32 domain
-    ) private view returns (bytes32) {
+    function computeSigningRoot(Structs.BeaconBlockHeader memory beacon, bytes32 domain) private view returns (bytes32) {
         bytes32[] memory chunks = new bytes32[](2);
         chunks[0] = merkleize.hashTreeRoot(beacon);
         chunks[1] = domain;
@@ -206,20 +161,10 @@ contract LightClient {
         return merkleize.merkleize_chunks(chunks, 2);
     }
 
-    function validateLightClientUpdate(
-        Structs.LightClientUpdate memory update,
-        uint64 currentSlot,
-        bytes32 genesisValidatorsRoot
-    ) private view {
+    function validateLightClientUpdate(Structs.LightClientUpdate memory update, uint64 currentSlot, bytes32 genesisValidatorsRoot) private view {
         uint256 syncCommitteeParticipants;
-        for (
-            uint256 i = 0;
-            i < update.syncAggregate.syncCommitteeBits.length;
-            i++
-        ) {
-            if (update.syncAggregate.syncCommitteeBits[i]) {
-                syncCommitteeParticipants++;
-            }
+        for (uint256 i = 0; i < update.syncAggregate.syncCommitteeBits.length; i++) {
+            if (update.syncAggregate.syncCommitteeBits[i]) { syncCommitteeParticipants++; }
         }
         require(syncCommitteeParticipants >= MIN_SYNC_COMMITTEE_PARTICIPANTS);
 
@@ -227,38 +172,21 @@ contract LightClient {
 
         require(currentSlot >= update.signatureSlot);
         require(update.signatureSlot > update.attestedHeader.beacon.slot);
-        require(
-            update.attestedHeader.beacon.slot >=
-                update.finalizedHeader.beacon.slot
-        );
+        require(update.attestedHeader.beacon.slot >= update.finalizedHeader.beacon.slot);
 
-        uint64 storePeriod = Utils.computeSyncCommitteePeriodAtSlot(
-            store.finalizedHeader.beacon.slot
-        );
-        uint64 updateSignaturePeriod = Utils.computeSyncCommitteePeriodAtSlot(
-            update.signatureSlot
-        );
+        uint64 storePeriod = Utils.computeSyncCommitteePeriodAtSlot(store.finalizedHeader.beacon.slot);
+        uint64 updateSignaturePeriod = Utils.computeSyncCommitteePeriodAtSlot(update.signatureSlot);
 
         if (isNextSyncCommitteeKnown()) {
-            require(
-                (updateSignaturePeriod == storePeriod) ||
-                    (updateSignaturePeriod == storePeriod + 1)
-            );
+            require((updateSignaturePeriod == storePeriod) ||(updateSignaturePeriod == storePeriod + 1));
         } else {
             require(updateSignaturePeriod == storePeriod);
         }
 
-        uint64 updateAttestedPeriod = Utils.computeSyncCommitteePeriodAtSlot(
-            update.attestedHeader.beacon.slot
-        );
-        bool updateHasNextSyncCommittee = (!isNextSyncCommitteeKnown()) &&
-            (isSyncCommitteeUpdate(update) &&
-                (updateAttestedPeriod == storePeriod));
+        uint64 updateAttestedPeriod = Utils.computeSyncCommitteePeriodAtSlot(update.attestedHeader.beacon.slot);
+        bool updateHasNextSyncCommittee = (!isNextSyncCommitteeKnown()) && (isSyncCommitteeUpdate(update) && (updateAttestedPeriod == storePeriod));
 
-        require(
-            (update.attestedHeader.beacon.slot >
-                store.finalizedHeader.beacon.slot) || updateHasNextSyncCommittee
-        );
+        require((update.attestedHeader.beacon.slot > store.finalizedHeader.beacon.slot) || updateHasNextSyncCommittee);
 
         if (!isFinalityUpdate(update)) {
             // The finalized header must be empty
@@ -285,19 +213,12 @@ contract LightClient {
         if (!isSyncCommitteeUpdate(update)) {
             Structs.SyncCommittee memory emptySyncCommittee;
             // This can be improved
-            require(
-                keccak256(update.nextSyncCommittee.aggregatePubkey) !=
-                    keccak256(emptySyncCommittee.aggregatePubkey)
-            );
+            require(keccak256(update.nextSyncCommittee.aggregatePubkey) != keccak256(emptySyncCommittee.aggregatePubkey));
         } else {
-            if (
-                updateAttestedPeriod == storePeriod &&
-                isNextSyncCommitteeKnown()
+            if (updateAttestedPeriod == storePeriod && isNextSyncCommitteeKnown()
             ) {
                 // This can be improved
-                require(
-                    keccak256(update.nextSyncCommittee.aggregatePubkey) !=
-                        keccak256(store.nextSyncCommittee.aggregatePubkey)
+                require( keccak256(update.nextSyncCommittee.aggregatePubkey) != keccak256(store.nextSyncCommittee.aggregatePubkey)
                 );
             }
             require(
@@ -318,9 +239,7 @@ contract LightClient {
             syncCommittee = store.nextSyncCommittee;
         }
 
-        bytes[] memory participantPubkeys = new bytes[](
-            syncCommitteeParticipants
-        );
+        bytes[] memory participantPubkeys = new bytes[](syncCommitteeParticipants);
         uint256 j;
         for (uint256 i = 0; i < SYNC_COMMITTEE_SIZE; i++) {
             if (update.syncAggregate.syncCommitteeBits[i]) {
@@ -329,97 +248,61 @@ contract LightClient {
             }
         }
 
-        uint64 forkVersionSlot = (
-            update.signatureSlot > 1 ? update.signatureSlot : 1
-        ) - 1;
-        bytes4 forkVersion = computeForkVersion(
-            Utils.computeEpochAtSlot(forkVersionSlot)
-        );
+        uint64 forkVersionSlot = (update.signatureSlot > 1 ? update.signatureSlot : 1) - 1;
+        bytes4 forkVersion = computeForkVersion(Utils.computeEpochAtSlot(forkVersionSlot));
         bytes32 domain = computeDomain(forkVersion, genesisValidatorsRoot);
 
-        bytes32 signingRoot = computeSigningRoot(
-            update.attestedHeader.beacon,
-            domain
-        );
+        bytes32 signingRoot = computeSigningRoot(update.attestedHeader.beacon, domain);
 
         // !! BLS signature verification, to implement
         //require(bls.fastAggregateVerify(participantPubkeys, signingRoot, update.syncAggregate.syncCommitteeSignature));
     }
 
-    function isBetterUpdate(
-        Structs.LightClientUpdate memory newUpdate,
-        Structs.LightClientUpdate memory oldUpdate
-    ) private pure returns (bool) {
+    function isBetterUpdate(Structs.LightClientUpdate memory newUpdate, Structs.LightClientUpdate memory oldUpdate) private pure returns (bool) {
         uint256 maxActiveParticipants = newUpdate.syncAggregate.syncCommitteeBits.length;
         
         uint256 newNumActiveParticipants;
-        for (
-            uint256 i = 0;
-            i < newUpdate.syncAggregate.syncCommitteeBits.length;
-            i++
-        ) {
+        for (uint256 i = 0; i < newUpdate.syncAggregate.syncCommitteeBits.length; i++) {
             if (newUpdate.syncAggregate.syncCommitteeBits[i]) {
                 newNumActiveParticipants++;
             }
         }
 
         uint256 oldNumActiveParticipants;
-        for (
-            uint256 i = 0;
-            i < oldUpdate.syncAggregate.syncCommitteeBits.length;
-            i++
-        ) {
-            if (oldUpdate.syncAggregate.syncCommitteeBits[i]) {
-                oldNumActiveParticipants++;
-            }
+        for (uint256 i = 0; i < oldUpdate.syncAggregate.syncCommitteeBits.length; i++) {
+            if (oldUpdate.syncAggregate.syncCommitteeBits[i]) { oldNumActiveParticipants++; }
         }
 
         bool newHasSupermajority = newNumActiveParticipants * 3 >= maxActiveParticipants * 2;
         bool oldHasSupermajority = oldNumActiveParticipants * 3 >= maxActiveParticipants * 2;
 
-        if ( newHasSupermajority != oldHasSupermajority) {
-            return newHasSupermajority && !oldHasSupermajority;
-        }
-        if(!newHasSupermajority && newNumActiveParticipants != oldNumActiveParticipants) {
-            return newNumActiveParticipants > oldNumActiveParticipants;
-        }
+        if ( newHasSupermajority != oldHasSupermajority) { return newHasSupermajority && !oldHasSupermajority; }
+        if(!newHasSupermajority && newNumActiveParticipants != oldNumActiveParticipants) { return newNumActiveParticipants > oldNumActiveParticipants; }
 
         bool newHasRelevantSyncCommittee = isSyncCommitteeUpdate(newUpdate) && (Utils.computeSyncCommitteePeriodAtSlot(newUpdate.attestedHeader.beacon.slot) == Utils.computeSyncCommitteePeriodAtSlot(newUpdate.signatureSlot));
         bool oldHasRelevantSyncCommittee = isSyncCommitteeUpdate(oldUpdate) && (Utils.computeSyncCommitteePeriodAtSlot(oldUpdate.attestedHeader.beacon.slot) == Utils.computeSyncCommitteePeriodAtSlot(oldUpdate.signatureSlot));
 
-        if(newHasRelevantSyncCommittee != oldHasRelevantSyncCommittee) {
-            return newHasRelevantSyncCommittee;
-        }
+        if(newHasRelevantSyncCommittee != oldHasRelevantSyncCommittee) { return newHasRelevantSyncCommittee; }
 
         bool newHasFinality = isFinalityUpdate(newUpdate);
         bool oldHasFinality = isFinalityUpdate(oldUpdate);
 
-        if(newHasFinality != oldHasFinality) {
-            return newHasFinality;
-        }
+        if(newHasFinality != oldHasFinality) { return newHasFinality; }
 
         if ( newHasFinality ) {
             bool newHasSyncCommitteeFinality = (Utils.computeSyncCommitteePeriodAtSlot(newUpdate.finalizedHeader.beacon.slot) == Utils.computeSyncCommitteePeriodAtSlot(newUpdate.attestedHeader.beacon.slot));
             bool oldHasSyncCommitteeFinality = (Utils.computeSyncCommitteePeriodAtSlot(oldUpdate.finalizedHeader.beacon.slot) == Utils.computeSyncCommitteePeriodAtSlot(oldUpdate.attestedHeader.beacon.slot));
-            if(newHasSyncCommitteeFinality != oldHasSyncCommitteeFinality) {
-                return newHasSyncCommitteeFinality;
-            }
+            if(newHasSyncCommitteeFinality != oldHasSyncCommitteeFinality) { return newHasSyncCommitteeFinality; }
         }
 
-        if (newNumActiveParticipants != oldNumActiveParticipants) {
-            return newNumActiveParticipants > oldNumActiveParticipants;
-        }
+        if (newNumActiveParticipants != oldNumActiveParticipants) { return newNumActiveParticipants > oldNumActiveParticipants; }
 
-        if(newUpdate.attestedHeader.beacon.slot != oldUpdate.attestedHeader.beacon.slot){
-            return newUpdate.attestedHeader.beacon.slot < oldUpdate.attestedHeader.beacon.slot;
-        }
+        if(newUpdate.attestedHeader.beacon.slot != oldUpdate.attestedHeader.beacon.slot){ return newUpdate.attestedHeader.beacon.slot < oldUpdate.attestedHeader.beacon.slot; }
 
         return newUpdate.signatureSlot < oldUpdate.signatureSlot;
     }
 
-    function applyLightClientUpdate(
-        Structs.LightClientUpdate memory update
-    ) private {
+    function applyLightClientUpdate( Structs.LightClientUpdate memory update) private {
         uint64 storePeriod = Utils.computeSyncCommitteePeriodAtSlot(store.finalizedHeader.beacon.slot);
         uint64 updateFinalizedPeriod = Utils.computeSyncCommitteePeriodAtSlot(update.finalizedHeader.beacon.slot);
 
@@ -440,34 +323,18 @@ contract LightClient {
         }
     }
 
-    function processLightClientUpdate(
-        Structs.LightClientUpdate memory update,
-        uint64 currentSlot,
-        bytes32 genesisValidatorsRoot
-    ) external {
+    function processLightClientUpdate(Structs.LightClientUpdate memory update, uint64 currentSlot, bytes32 genesisValidatorsRoot) external {
         validateLightClientUpdate(update, currentSlot, genesisValidatorsRoot);
         
-        bool[SYNC_COMMITTEE_SIZE] memory syncCommitteeBits = update
-            .syncAggregate
-            .syncCommitteeBits;
+        bool[SYNC_COMMITTEE_SIZE] memory syncCommitteeBits = update.syncAggregate.syncCommitteeBits;
 
-        if (
-            store.bestValidUpdate.attestedHeader.beacon.bodyRoot !=
-            bytes32(0) ||
-            isBetterUpdate(update, store.bestValidUpdate)
-        ) {
+        if (store.bestValidUpdate.attestedHeader.beacon.bodyRoot != bytes32(0) || isBetterUpdate(update, store.bestValidUpdate)) {
             store.bestValidUpdate = update;
         }
 
         uint64 currentParticipants;
-        for (
-            uint256 i = 0;
-            i < SYNC_COMMITTEE_SIZE;
-            i++
-        ) {
-            if (syncCommitteeBits[i]) {
-                currentParticipants++;
-            }
+        for (uint256 i = 0; i < SYNC_COMMITTEE_SIZE; i++) {
+            if (syncCommitteeBits[i]) {currentParticipants++; }
         }
 
         store.currentMaxActiveParticipants = (store.currentMaxActiveParticipants > currentParticipants ? store.currentMaxActiveParticipants : currentParticipants);
@@ -485,13 +352,7 @@ contract LightClient {
             (Utils.computeSyncCommitteePeriodAtSlot(update.finalizedHeader.beacon.slot) == Utils.computeSyncCommitteePeriodAtSlot(update.attestedHeader.beacon.slot))
         );
 
-        if (
-            currentParticipants * 3 >= SYNC_COMMITTEE_SIZE * 2 &&
-            (
-                update.finalizedHeader.beacon.slot > store.finalizedHeader.beacon.slot ||
-                updateHasFinalizedNextSyncCommittee
-            )
-        ) {
+        if (currentParticipants * 3 >= SYNC_COMMITTEE_SIZE * 2 && ( update.finalizedHeader.beacon.slot > store.finalizedHeader.beacon.slot || updateHasFinalizedNextSyncCommittee)) {
             applyLightClientUpdate(update);
             Structs.LightClientUpdate memory emptyLightClientUpdate;
             store.bestValidUpdate = emptyLightClientUpdate;

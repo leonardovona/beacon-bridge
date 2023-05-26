@@ -7,18 +7,14 @@ contract Merkleize {
 
     bytes32[100] zeroHashes;
 
-        // Initialization
+    // Initialization
     function initZeroHashes() private {
         for (uint256 layer = 1; layer < 100; layer++) {
-            zeroHashes[layer] = sha256(
-                abi.encodePacked(zeroHashes[layer - 1], zeroHashes[layer - 1])
-            );
+            zeroHashes[layer] = sha256(abi.encodePacked(zeroHashes[layer - 1], zeroHashes[layer - 1]));
         }
     }
 
-    constructor(){
-        initZeroHashes();
-    }
+    constructor(){ initZeroHashes(); }
 
     function merge(
         bytes32 h,
@@ -45,11 +41,7 @@ contract Merkleize {
     }
 
     // Adapted from https://github.com/ethereum/consensus-specs/blob/v1.3.0/tests/core/pyspec/eth2spec/utils/merkle_minimal.py#L7
-    function merkleize_chunks(bytes32[] memory chunks, uint256 limit)
-        public
-        view
-        returns (bytes32)
-    {
+    function merkleize_chunks(bytes32[] memory chunks, uint256 limit) public view returns (bytes32) {
         uint256 count = chunks.length;
 
         // if(count > limit) raise exception
@@ -59,7 +51,6 @@ contract Merkleize {
         }
 
         uint256 depth = Utils.log2({x: count - 1, ceil: true});
-
         if (depth == 0) depth = 1;
 
         uint256 max_depth = Utils.log2({x: limit - 1, ceil: true});
@@ -82,11 +73,7 @@ contract Merkleize {
     }
 
     // https://eth2book.info/capella/part2/building_blocks/merkleization/
-    function hashTreeRoot(Structs.BeaconBlockHeader memory header)
-        public
-        view
-        returns (bytes32)
-    {
+    function hashTreeRoot(Structs.BeaconBlockHeader memory header) public view returns (bytes32) {
         bytes32[] memory chunks = new bytes32[](5);
         chunks[0] = Utils.toBytes(header.slot);
         chunks[1] = Utils.toBytes(header.proposerIndex);
@@ -97,11 +84,7 @@ contract Merkleize {
         return merkleize_chunks(chunks, 5);
     }
 
-    function hashTreeRoot(bytes[SYNC_COMMITTEE_SIZE] memory pubkeys)
-        public
-        view
-        returns (bytes32)
-    {
+    function hashTreeRoot(bytes[SYNC_COMMITTEE_SIZE] memory pubkeys) public view returns (bytes32) {
         bytes32[] memory chunks = new bytes32[](SYNC_COMMITTEE_SIZE);
         for (uint256 i = 0; i < SYNC_COMMITTEE_SIZE; i++) {
             chunks[i] = sha256(abi.encodePacked(pubkeys[i], bytes16(0)));
@@ -110,11 +93,7 @@ contract Merkleize {
         return merkleize_chunks(chunks, SYNC_COMMITTEE_SIZE);
     }
 
-    function hashTreeRoot(Structs.SyncCommittee memory syncCommittee)
-        public
-        view
-        returns (bytes32)
-    {
+    function hashTreeRoot(Structs.SyncCommittee memory syncCommittee) public view returns (bytes32) {
         bytes32[] memory chunks = new bytes32[](2);
         chunks[0] = hashTreeRoot(syncCommittee.pubkeys);
         chunks[1] = sha256(
@@ -124,12 +103,9 @@ contract Merkleize {
         return merkleize_chunks(chunks, 2);
     }
 
-    function hashTreeRoot(Structs.ExecutionPayloadHeader memory header)
-        public
-        view
-        returns (bytes32)
-    {
+    function hashTreeRoot(Structs.ExecutionPayloadHeader memory header) public view returns (bytes32) {
         bytes32[] memory chunks = new bytes32[](15);
+
         chunks[0] = header.parentHash;
         chunks[1] = bytes32(abi.encodePacked(header.feeRecipient, bytes12(0))); //not sure
         chunks[2] = header.stateRoot;
@@ -153,11 +129,7 @@ contract Merkleize {
 
         bytes32[] memory chunksExtraData = new bytes32[](2);
         chunksExtraData[0] = bytes32(
-            abi.encodePacked(
-                header.extraData,
-                new bytes(32 - header.extraData.length)
-            )
-        );
+            abi.encodePacked(header.extraData, new bytes(32 - header.extraData.length)));
         chunksExtraData[1] = bytes32(Utils.reverse(header.extraData.length));
         chunks[10] = merkleize_chunks(chunksExtraData, 2);
 

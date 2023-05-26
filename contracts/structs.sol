@@ -1,6 +1,8 @@
 pragma solidity ^0.8.17;
 
-import {NEXT_SYNC_COMMITTEE_INDEX_LOG_2, FINALIZED_ROOT_INDEX_LOG_2, SYNC_COMMITTEE_SIZE} from "./constants.sol";
+import {
+    NEXT_SYNC_COMMITTEE_INDEX_LOG_2, FINALIZED_ROOT_INDEX_LOG_2, SYNC_COMMITTEE_SIZE
+} from "./constants.sol";
 
 library Structs {
     //Types definition
@@ -13,6 +15,7 @@ library Structs {
         uint64 previousMaxActiveParticipants;
         uint64 currentMaxActiveParticipants;
     }
+
 
     struct LightClientUpdate {
         LightClientHeader attestedHeader;

@@ -3,12 +3,8 @@ pragma solidity ^0.8.17;
 import "./constants.sol";
 
 library Utils {
-    // Math utilities
     // taken from https://medium.com/coinmonks/math-in-solidity-part-5-exponent-and-logarithm-9aef8515136e
-    function log2(
-        uint256 x, 
-        bool ceil
-    ) internal pure returns (uint256 n) {
+    function log2(uint256 x, bool ceil) internal pure returns (uint256 n) {
         if (x >= 2**128) { x >>= 128; n += 128; }
         if (x >= 2**64) { x >>= 64; n += 64; }
         if (x >= 2**32) { x >>= 32; n += 32; }

@@ -25,7 +25,7 @@ The life cycle of the light client is the following:
 
 from utils.ssz.ssz_typing import Bytes32
 
-from utils.to_string import light_client_bootstrap_to_string, light_client_update_to_string
+from utils.to_string import light_client_bootstrap_to_string, light_client_update_to_string, sync_committee_to_string
 
 from web3 import Web3, HTTPProvider
 from solcx import install_solc, compile_source
@@ -37,7 +37,8 @@ from utils.clock import get_current_slot, time_until_next_epoch
 from utils.specs import (
     Root, LightClientBootstrap, compute_sync_committee_period_at_slot, MAX_REQUEST_LIGHT_CLIENT_UPDATES,
     LightClientOptimisticUpdate, LightClientStore, LightClientUpdate, Slot,
-    LightClientFinalityUpdate, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, compute_epoch_at_slot)
+    LightClientFinalityUpdate, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, compute_epoch_at_slot,
+    SyncCommittee)
 
 # parsing is the package that contains the functions to parse the data returned by the chain node
 import utils.parsing as parsing
@@ -66,9 +67,29 @@ web3.eth.default_account = web3.eth.accounts[0]
 
 light_client = None
 
+from dataclasses import dataclass
+
+from utils.ssz.ssz_typing import uint64
+
+@dataclass
+class MyLightClientStore(object):
+    beacon_slot: uint64
+    current_sync_committee: SyncCommittee
+    next_sync_committee: SyncCommittee
+    previous_max_active_participants: uint64
+    current_max_active_participants: uint64
+
+store = MyLightClientStore(
+    beacon_slot=uint64(0),
+    current_sync_committee=SyncCommittee(),
+    next_sync_committee=SyncCommittee(),
+    previous_max_active_participants=uint64(0),
+    current_max_active_participants=uint64(0)
+)
+
 def initialize_light_client_store(trusted_block_root: Root,
-                                  light_client_bootstrap: LightClientBootstrap) -> LightClientStore:
-    light_client_bootstrap = ast.literal_eval(light_client_bootstrap_to_string(light_client_bootstrap))
+                                  bootstrap: LightClientBootstrap) -> LightClientStore:
+    light_client_bootstrap = ast.literal_eval(light_client_bootstrap_to_string(bootstrap))
     trusted_block_root = str(trusted_block_root)
 
     event_filter = light_client.events.BootstrapComplete.create_filter(fromBlock='latest')
@@ -85,22 +106,35 @@ def initialize_light_client_store(trusted_block_root: Root,
             break
         asyncio.sleep(2)
     # tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+    store.beacon_slot = bootstrap.header.beacon.slot
+    store.current_sync_committee = bootstrap.current_sync_committee
     
     
 def process_light_client_update(update: LightClientUpdate,
                                 current_slot: Slot,
                                 genesis_validators_root: Root) -> None:
     
+    store_period = compute_sync_committee_period_at_slot(store.beacon_slot)
+    update_signature_period = compute_sync_committee_period_at_slot(update.signature_slot)
+
+    sync_committee = SyncCommittee()
+    if(update_signature_period == store_period):
+        sync_committee = store.current_sync_committee
+    else:
+        sync_committee = store.next_sync_committee
+
     light_client_update = ast.literal_eval(light_client_update_to_string(update))
     current_slot = int(str(current_slot))
     genesis_validators_root = str(genesis_validators_root)
+    sync_committee = ast.literal_eval(sync_committee_to_string(sync_committee))
     
     event_filter = light_client.events.UpdateProcessed.create_filter(fromBlock='latest')
 
     tx_hash = light_client.functions.processLightClientUpdate(
         light_client_update,
         current_slot,
-        genesis_validators_root
+        genesis_validators_root,
+        sync_committee
     ).transact({'gas': 100_000_000})
 
     while True:
@@ -108,6 +142,18 @@ def process_light_client_update(update: LightClientUpdate,
         if len(entries) > 0:
             break
         asyncio.sleep(2)
+
+    update_finalized_period = compute_sync_committee_period_at_slot(update.finalized_header.beacon.slot)
+
+    if store.next_sync_committee != SyncCommittee():
+       store.next_sync_committee = update.next_sync_committee
+    elif update_finalized_period == store_period + 1:
+        store.current_sync_committee = store.next_sync_committee
+        store.next_sync_committee = update.next_sync_committee
+        store.previous_max_active_participants = store.current_max_active_participants
+        store.current_max_active_participants = 0
+    if update.finalized_header.beacon.slot > store.beacon_slot:
+        store.beacon_slot = update.finalized_header.beacon.slot
 
 
 def beacon_api(url):
@@ -394,7 +440,7 @@ async def main():
     # SYNC
     sync(last_period, current_period)
     print("Sync done")
-    exit()
+    # exit()
     # subscribe
     print("Start optimistic update handler")
     asyncio.create_task(handle_optimistic_updates())

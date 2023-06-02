@@ -8,9 +8,9 @@ library Structs {
     //Types definition
     struct LightClientStore {
         uint64 beaconSlot;
-        SyncCommittee currentSyncCommittee;
-        SyncCommittee nextSyncCommittee;
-        LightClientUpdate bestValidUpdate;
+        bytes32 currentSyncCommitteeRoot;
+        bytes32 nextSyncCommitteeRoot;
+        // LightClientUpdate bestValidUpdate;
         uint64 previousMaxActiveParticipants;
         uint64 currentMaxActiveParticipants;
     }

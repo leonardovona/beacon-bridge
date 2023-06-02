@@ -60,9 +60,11 @@ contract LightClient {
 
         require(merkleize.hashTreeRoot(bootstrap.header.beacon) == trustedBlockRoot);
 
+        bytes32 currentSyncCommitteeRoot = merkleize.hashTreeRoot(bootstrap.currentSyncCommittee);
+
         require(
             isValidMerkleBranch(
-                merkleize.hashTreeRoot(bootstrap.currentSyncCommittee),
+                currentSyncCommitteeRoot,
                 bootstrap.currentSyncCommitteeBranch,
                 CURRENT_SYNC_COMMITTEE_INDEX_LOG_2,
                 getSubtreeIndex(CURRENT_SYNC_COMMITTEE_INDEX),
@@ -72,15 +74,14 @@ contract LightClient {
 
         // Initialize store
         store.beaconSlot = bootstrap.header.beacon.slot;
-        // store.currentSyncCommittee = bootstrap.currentSyncCommittee;
+        store.currentSyncCommitteeRoot = currentSyncCommitteeRoot;
 
         emit BootstrapComplete(bootstrap.header.beacon.slot);
     }
 
     // Not sure if this check is correct. There is for sure a better way to do this
     function isNextSyncCommitteeKnown() private view returns (bool) {
-        Structs.SyncCommittee memory emptySyncCommittee;
-        return keccak256(store.nextSyncCommittee.aggregatePubkey) != keccak256(emptySyncCommittee.aggregatePubkey);
+        return store.nextSyncCommitteeRoot != bytes32(0);
     }
 
     // Not sure if it is correct
@@ -130,7 +131,12 @@ contract LightClient {
         return merkleize.merkleize_chunks(chunks, 2);
     }
 
-    function validateLightClientUpdate(Structs.LightClientUpdate memory update, uint64 currentSlot, bytes32 genesisValidatorsRoot) private view {
+    function validateLightClientUpdate(
+        Structs.LightClientUpdate memory update, 
+        uint64 currentSlot, 
+        bytes32 genesisValidatorsRoot, 
+        Structs.SyncCommittee memory syncCommittee
+    ) private view {
         uint256 syncCommitteeParticipants;
         for (uint256 i = 0; i < update.syncAggregate.syncCommitteeBits.length; i++) {
             if (update.syncAggregate.syncCommitteeBits[i]) { syncCommitteeParticipants++; }
@@ -187,8 +193,7 @@ contract LightClient {
             if (updateAttestedPeriod == storePeriod && isNextSyncCommitteeKnown()
             ) {
                 // This can be improved
-                require( keccak256(update.nextSyncCommittee.aggregatePubkey) != keccak256(store.nextSyncCommittee.aggregatePubkey)
-                );
+                require(merkleize.hashTreeRoot(update.nextSyncCommittee) == store.nextSyncCommitteeRoot);
             }
             require(
                 isValidMerkleBranch(
@@ -201,11 +206,11 @@ contract LightClient {
             );
         }
 
-        Structs.SyncCommittee memory syncCommittee;
+        // Structs.SyncCommittee memory syncCommittee;
         if (updateSignaturePeriod == storePeriod) {
-            syncCommittee = store.currentSyncCommittee;
+            require(merkleize.hashTreeRoot(syncCommittee) == store.currentSyncCommitteeRoot);
         } else {
-            syncCommittee = store.nextSyncCommittee;
+            require(merkleize.hashTreeRoot(syncCommittee) == store.nextSyncCommitteeRoot);
         }
 
         bytes[] memory participantPubkeys = new bytes[](syncCommitteeParticipants);
@@ -233,10 +238,10 @@ contract LightClient {
 
         if(!isNextSyncCommitteeKnown()){
             require(updateFinalizedPeriod == storePeriod);
-            store.nextSyncCommittee = update.nextSyncCommittee;
+            store.nextSyncCommitteeRoot = merkleize.hashTreeRoot(update.nextSyncCommittee);
         } else if(updateFinalizedPeriod == storePeriod + 1) {
-            store.currentSyncCommittee = store.nextSyncCommittee;
-            store.nextSyncCommittee = update.nextSyncCommittee;
+            store.currentSyncCommitteeRoot = store.nextSyncCommitteeRoot;
+            store.nextSyncCommitteeRoot = merkleize.hashTreeRoot(update.nextSyncCommittee);
             store.previousMaxActiveParticipants = store.currentMaxActiveParticipants;
             store.currentMaxActiveParticipants = 0;
         }
@@ -245,8 +250,13 @@ contract LightClient {
         }
     }
 
-    function processLightClientUpdate(Structs.LightClientUpdate memory update, uint64 currentSlot, bytes32 genesisValidatorsRoot) external {
-        validateLightClientUpdate(update, currentSlot, genesisValidatorsRoot);
+    function processLightClientUpdate(
+        Structs.LightClientUpdate memory update,
+        uint64 currentSlot,
+        bytes32 genesisValidatorsRoot,
+        Structs.SyncCommittee memory syncCommittee
+    ) external {
+        validateLightClientUpdate(update, currentSlot, genesisValidatorsRoot, syncCommittee);
         bool[SYNC_COMMITTEE_SIZE] memory syncCommitteeBits = update.syncAggregate.syncCommitteeBits;
 
         uint64 currentParticipants;

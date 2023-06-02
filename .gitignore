@@ -1,6 +1,7 @@
 .venv/
 .vscode/
 test/
+CARONTE/
 
 __pycache__/
 *.py[cod]

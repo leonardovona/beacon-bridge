@@ -5,11 +5,11 @@ import "./utils.sol";
 
 contract Merkleize {
 
-    bytes32[20] zeroHashes;
+    bytes32[10] zeroHashes; // not sure if 10 is enough
 
     // Initialization
     function initZeroHashes() private {
-        for (uint256 layer = 1; layer < 20; layer++) {
+        for (uint256 layer = 1; layer < 10; ++layer) {
             zeroHashes[layer] = sha256(abi.encodePacked(zeroHashes[layer - 1], zeroHashes[layer - 1]));
         }
     }
@@ -23,7 +23,7 @@ contract Merkleize {
         uint256 depth,
         bytes32[] memory tmp
     ) private view {
-        uint256 j = 0;
+        uint256 j;
         while (true) {
             if (i & (1 << j) == 0) {
                 if (i == count && j < depth) {
@@ -34,7 +34,7 @@ contract Merkleize {
             } else {
                 h = sha256(abi.encodePacked(tmp[j], h));
             }
-            j++;
+            ++j;
         }
 
         tmp[j] = h;
@@ -57,7 +57,7 @@ contract Merkleize {
 
         bytes32[] memory tmp = new bytes32[](max_depth + 1);
 
-        for (uint256 i = 0; i < count; i++) {
+        for (uint256 i; i < count; ++i) {
             merge(chunks[i], i, count, depth, tmp);
         }
 
@@ -65,7 +65,7 @@ contract Merkleize {
             merge(zeroHashes[0], count, count, depth, tmp);
         }
 
-        for (uint256 j = depth; j < max_depth; j++) {
+        for (uint256 j = depth; j < max_depth; ++j) {
             tmp[j + 1] = sha256(abi.encodePacked(tmp[j], zeroHashes[j]));
         }
 
@@ -86,7 +86,7 @@ contract Merkleize {
 
     function hashTreeRoot(bytes[SYNC_COMMITTEE_SIZE] memory pubkeys) public view returns (bytes32) {
         bytes32[] memory chunks = new bytes32[](SYNC_COMMITTEE_SIZE);
-        for (uint256 i = 0; i < SYNC_COMMITTEE_SIZE; i++) {
+        for (uint256 i; i < SYNC_COMMITTEE_SIZE; ++i) {
             chunks[i] = sha256(abi.encodePacked(pubkeys[i], bytes16(0)));
         }
 
@@ -112,9 +112,9 @@ contract Merkleize {
         chunks[3] = header.receiptsRoot;
 
         bytes32[] memory chunksLogsBloom = new bytes32[](256 / 32);
-        for (uint256 i = 0; i < (256 / 32); i++) {
+        for (uint256 i; i < (256 / 32); ++i) {
             bytes memory temp = new bytes(32);
-            for (uint256 j = 0; j < 32; j++) {
+            for (uint256 j; j < 32; ++j) {
                 temp[j] = header.logsBloom[i * 32 + j];
             }
             chunksLogsBloom[i] = bytes32(temp);

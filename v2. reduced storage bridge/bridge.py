@@ -166,7 +166,6 @@ def get_genesis_validators_root():
     Retrieve the genesis validators root from the beacon chain node
     """
     return Root(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/genesis")['data']['genesis_validators_root'])
-    # return Root(parsing.hex_to_bytes(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/genesis")['data']['genesis_validators_root']))
 
 
 genesis_validators_root = get_genesis_validators_root()
@@ -185,7 +184,6 @@ def get_trusted_block_root():
     Retrieve the last finalized block root from the beacon chain node
     """
     return Root(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/headers/finalized")['data']['root'])
-    # return Root(parsing.hex_to_bytes(beacon_api(f"{ENDPOINT_NODE_URL}/eth/v1/beacon/headers/finalized")['data']['root']))
 
 
 def get_light_client_bootstrap(trusted_block_root):
@@ -200,7 +198,6 @@ def get_light_client_bootstrap(trusted_block_root):
         current_sync_committee=parsing.parse_sync_committee(
             response['current_sync_committee']),
         current_sync_committee_branch=response['current_sync_committee_branch']
-        # current_sync_committee_branch = map(parsing.hex_to_bytes, response['current_sync_committee_branch'])
     )
 
 
@@ -210,12 +207,6 @@ def bootstrap():
     """
     trusted_block_root = get_trusted_block_root()
     light_client_bootstrap = get_light_client_bootstrap(trusted_block_root)
-
-    # with open("./test/trusted_block_root.txt", "w") as f:
-    #     f.write(str(trusted_block_root))
-    
-    # with open("./test/light_client_bootstrap.txt", "w") as f:
-    #     f.write(light_client_bootstrap_to_string(light_client_bootstrap))
 
     initialize_light_client_store(trusted_block_root, light_client_bootstrap)
 
@@ -331,7 +322,6 @@ def get_finality_update():
         finalized_header=parsing.parse_header(
             finality_update['finalized_header']),
         finality_branch=finality_update['finality_branch'],
-        # finality_branch=parsing.hex_to_bytes(finality_update['finality_branch']),
         sync_aggregate=parsing.parse_sync_aggregate(
             finality_update['sync_aggregate']),
         signature_slot=int(finality_update['signature_slot'])
@@ -379,20 +369,7 @@ def sync(last_period, current_period):
         for update in updates:
             print("Processing update")
             process_light_client_update(update, get_current_slot(tolerance=MAX_CLOCK_DISPARITY_SEC), genesis_validators_root)
-            
-        # i = 0
-        # with open("./test/genesis_validators_root", "w") as f:
-        #     f.write(str(genesis_validators_root))
-        # for update in updates:
-        #     with open("./test/light_client_update_" + str(i) + ".txt", "w") as f:
-        #         f.write(light_client_update_to_string(update))
-        #     with open("./test/current_slot_" + str(i) + ".txt", "w") as f:
-        #         f.write(str(get_current_slot(tolerance=MAX_CLOCK_DISPARITY_SEC)))
-        #     i += 1
-        #     print("Processing update")
-        #     process_light_client_update(light_client_store, update, get_current_slot(
-        #         tolerance=MAX_CLOCK_DISPARITY_SEC), genesis_validators_root)
-    
+
 
 def compile_contract():
     install_solc('0.8.17')
@@ -434,7 +411,6 @@ async def main():
     # SYNC
     sync(last_period, current_period)
     print("Sync done")
-    # exit()
     # subscribe
     print("Start optimistic update handler")
     asyncio.create_task(handle_optimistic_updates())

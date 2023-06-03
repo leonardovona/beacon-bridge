@@ -7,10 +7,9 @@ import {
 library Structs {
     //Types definition
     struct LightClientStore {
-        uint64 beaconSlot;
         bytes32 currentSyncCommitteeRoot;
         bytes32 nextSyncCommitteeRoot;
-        // LightClientUpdate bestValidUpdate;
+        uint64 beaconSlot;
         uint64 previousMaxActiveParticipants;
         uint64 currentMaxActiveParticipants;
     }
@@ -32,29 +31,29 @@ library Structs {
     }
 
     struct BeaconBlockHeader {
-        uint64 slot;
-        uint64 proposerIndex;
         bytes32 parentRoot;
         bytes32 stateRoot;
         bytes32 bodyRoot;
+        uint64 slot;
+        uint64 proposerIndex;
     }
 
     struct ExecutionPayloadHeader {
         bytes32 parentHash;
-        bytes20 feeRecipient;
         bytes32 stateRoot;
         bytes32 receiptsRoot;
-        bytes logsBloom; // BYTES_PER_LOGS_BLOOM len
         bytes32 prevRandao;
         uint64 blockNumber;
         uint64 gasLimit;
         uint64 gasUsed;
         uint64 timestamp;
-        bytes extraData;
         uint256 baseFeePerGas;
         bytes32 blockHash;
         bytes32 transactionsRoot;
         bytes32 withdrawalsRoot;
+        bytes20 feeRecipient;
+        bytes logsBloom; // BYTES_PER_LOGS_BLOOM len
+        bytes extraData;
     }
 
     struct LightClientHeader {

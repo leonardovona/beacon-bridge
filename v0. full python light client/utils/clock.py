@@ -1,10 +1,38 @@
 
 from utils.specs import (
-    Slot, SLOTS_PER_EPOCH, config
+    Slot, SLOTS_PER_EPOCH, Epoch, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, config
 )
+
+from utils.ssz.ssz_typing import uint64
 
 import time
 import math
+
+
+# class SyncPeriod(uint64):
+#     pass
+
+
+# def compute_epoch_at_slot(slot: Slot):
+#     """
+#     Return the epoch number at the given slot
+#     """
+#     return Epoch(math.floor(int(slot) / int(SLOTS_PER_EPOCH)))
+
+
+# def compute_sync_period_at_slot(slot: Slot):
+#     """
+#     Return the sync committee period at slot
+#     """
+#     return compute_sync_period_at_epoch(compute_epoch_at_slot(slot))
+
+
+# def compute_sync_period_at_epoch(epoch: Epoch):
+#     """
+#     Return the sync committee period at epoch
+#     """
+#     return SyncPeriod(math.floor(int(epoch) / int(EPOCHS_PER_SYNC_COMMITTEE_PERIOD)))
+
 
 def get_current_slot(tolerance=0):
     """

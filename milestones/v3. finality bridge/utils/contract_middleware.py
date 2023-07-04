@@ -3,13 +3,10 @@ from solcx import install_solc, compile_source
 
 from utils.specs import (
     Root, LightClientBootstrap, LightClientStore, MyLightClientStore, SyncCommittee, LightClientUpdate, Slot,
-    compute_sync_committee_period_at_slot, compute_fork_version, compute_epoch_at_slot,
-    compute_domain, DOMAIN_SYNC_COMMITTEE, compute_signing_root
+    compute_sync_committee_period_at_slot
 )
 
 from utils.serialize import light_client_bootstrap_to_string, light_client_update_to_string, sync_committee_to_string
-
-from utils.circuit_middleware import poseidon_committment_verify, aggregate_bls_verify
 
 from utils.ssz.ssz_typing import uint64
 
@@ -17,13 +14,14 @@ import asyncio, ast
 
 def init_web3():
     global web3
+
     web3 = Web3(HTTPProvider('http://localhost:7545', request_kwargs={'timeout': 300}))
     web3.eth.default_account = web3.eth.accounts[0]
 
 
 def compile_contract():
     install_solc('0.8.17')
-    with open ('./contracts/LightClient.sol', 'r') as file:
+    with open ('./contracts/lightClient.sol', 'r') as file:
         source = file.read()
     compiled_solc = compile_source(source, 
         output_values=['abi', 'bin'], 
@@ -39,6 +37,7 @@ def compile_contract():
 
 def init_contract():
     global light_client 
+
     init_web3()
     LightClient, abi = compile_contract()
     tx_hash = LightClient.constructor().transact({'gas': 30_000_000})
@@ -57,15 +56,14 @@ def initialize_light_client_store(trusted_block_root: Root,
         current_max_active_participants=uint64(0)
     )
 
-    sync_committee_poseidon, proof = poseidon_committment_verify(bootstrap.current_sync_committee)
+    light_client_bootstrap = ast.literal_eval(light_client_bootstrap_to_string(bootstrap))
+    trusted_block_root = str(trusted_block_root)
 
     event_filter = light_client.events.BootstrapComplete.create_filter(fromBlock='latest')
 
     light_client.functions.initializeLightClientStore(
-        ast.literal_eval(light_client_bootstrap_to_string(bootstrap)),
-        str(trusted_block_root),
-        sync_committee_poseidon,
-        proof
+        light_client_bootstrap,
+        trusted_block_root
     ).transact()
 
     while True:
@@ -73,7 +71,6 @@ def initialize_light_client_store(trusted_block_root: Root,
         if len(entries) > 0:
             break
         asyncio.sleep(2)
-
     store.beacon_slot = bootstrap.header.beacon.slot
     store.current_sync_committee = bootstrap.current_sync_committee
     
@@ -89,54 +86,29 @@ def process_light_client_update(update: LightClientUpdate,
     if(update_signature_period == store_period):
         sync_committee = store.current_sync_committee
     else:
-        sync_committee = store.next_sync_committee    
+        sync_committee = store.next_sync_committee
 
-    signing_root = compute_signing_root(
-        update.attested_header.beacon, 
-        compute_domain(
-            DOMAIN_SYNC_COMMITTEE, 
-            compute_fork_version(compute_epoch_at_slot(max(update.signature_slot, Slot(1)) - Slot(1))), 
-            str(genesis_validators_root)
-        )
-    )
-
-    signature_proof = aggregate_bls_verify(
-        sync_committee, 
-        update.sync_aggregate.sync_committee_bits, 
-        update.sync_aggregate.sync_committee_signature, 
-        signing_root)
-
-    update_finalized_period = compute_sync_committee_period_at_slot(update.finalized_header.beacon.slot)
-
-    if store.next_sync_committee != SyncCommittee() or update_finalized_period == store_period + 1:
-        sync_committee_poseidon, commitment_mapping_proof = poseidon_committment_verify(update.next_sync_committee)
-        # call with sync committee update
-        light_client.functions.processLightClientUpdate(
-            ast.literal_eval(light_client_update_to_string(update)),
-            int(str(current_slot)),
-            str(genesis_validators_root),
-            ast.literal_eval(sync_committee_to_string(sync_committee)),
-            sync_committee_poseidon,
-            commitment_mapping_proof,
-            signature_proof
-        ).transact({'gas': 30_000_000})
-    else:
-        # call without sync committee update
-        light_client.functions.processLightClientUpdate(
-            ast.literal_eval(light_client_update_to_string(update)),
-            int(str(current_slot)),
-            str(genesis_validators_root),
-            ast.literal_eval(sync_committee_to_string(sync_committee)),
-            signature_proof
-        ).transact({'gas': 30_000_000})
+    light_client_update = ast.literal_eval(light_client_update_to_string(update))
+    current_slot = int(str(current_slot))
+    genesis_validators_root = str(genesis_validators_root)
+    sync_committee = ast.literal_eval(sync_committee_to_string(sync_committee))
     
     event_filter = light_client.events.UpdateProcessed.create_filter(fromBlock='latest')
+
+    tx_hash = light_client.functions.processLightClientUpdate(
+        light_client_update,
+        current_slot,
+        genesis_validators_root,
+        sync_committee
+    ).transact({'gas': 30_000_000})
 
     while True:
         entries = event_filter.get_new_entries()
         if len(entries) > 0:
             break
-        asyncio.sleep(2)   
+        asyncio.sleep(2)
+
+    update_finalized_period = compute_sync_committee_period_at_slot(update.finalized_header.beacon.slot)
 
     if store.next_sync_committee != SyncCommittee():
        store.next_sync_committee = update.next_sync_committee

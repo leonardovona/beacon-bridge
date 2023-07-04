@@ -2,9 +2,8 @@
 from utils.specs import (
     Slot, SLOTS_PER_EPOCH, config
 )
+import time, math
 
-import time
-import math
 
 def get_current_slot(tolerance=0):
     """
@@ -13,6 +12,7 @@ def get_current_slot(tolerance=0):
     """
     diff_in_seconds = time.time() - config.MIN_GENESIS_TIME + tolerance
     return Slot(math.floor(diff_in_seconds / config.SECONDS_PER_SLOT))
+
 
 def time_until_next_epoch():
     """

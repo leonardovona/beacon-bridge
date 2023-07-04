@@ -24,32 +24,28 @@ The life cycle of the light client is the following:
 """
 
 from utils.ssz.ssz_typing import Bytes32
-
 from utils.clock import get_current_slot, time_until_next_epoch
-
 # specs is the package that contains the executable specifications of the Ethereum Beacon chain
 from utils.specs import (
     Root, compute_sync_committee_period_at_slot, MAX_REQUEST_LIGHT_CLIENT_UPDATES,
     LightClientOptimisticUpdate, LightClientUpdate, Slot,
     LightClientFinalityUpdate, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, compute_epoch_at_slot,
     SyncCommittee, LightClientHeader)
-
 from utils.beacon_middleware import (
     get_trusted_block_root, get_light_client_bootstrap, get_finality_update, get_updates_for_period, get_genesis_validators_root
 )
-
 from utils.contract_middleware import (
     init_contract, initialize_light_client_store, process_light_client_update
 )
-
 import math, asyncio
+
 
 # Takes into account possible clock drifts. The low value provides protection against a server sending updates too far in the future
 MAX_CLOCK_DISPARITY_SEC = 10
-
 FINALITY_UPDATE_POLL_INTERVAL = 48  # Da modificare
-
 LOOKAHEAD_EPOCHS_COMMITTEE_SYNC = 8
+NEXT_SYNC_COMMITTEE_INDEX_LOG_2 = 5
+FINALIZED_ROOT_INDEX_LOG_2 = 6
 
 
 def bootstrap():
@@ -86,8 +82,6 @@ def chunkify_range(from_period, to_period, items_per_chunk):
             break
     return chunks
 
-NEXT_SYNC_COMMITTEE_INDEX_LOG_2 = 5
-FINALIZED_ROOT_INDEX_LOG_2 = 6
 
 def process_light_client_finality_update(finality_update: LightClientFinalityUpdate,
                                          current_slot: Slot,

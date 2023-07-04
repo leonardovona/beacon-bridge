@@ -1,0 +1,14 @@
+****COMPILING CIRCUIT****
+[0m[1m[38;5;9merror[P1014][0m[1m:  The file ../../node_modules/circomlib/circuits/poseidon.circom to be included has not been found[0m
+ [0m[34m=[0m Consider using compilation option -l to indicate include paths
+
+[31mprevious errors were found[0m
+DONE (0s)
+****Running make to make witness generation binary****
+make: Entering directory '/home/leonardo/Code/ethereum-light-client-py/build/pubkey_poseidon_cpp'
+make: 'all' is up to date.
+make: Leaving directory '/home/leonardo/Code/ethereum-light-client-py/build/pubkey_poseidon_cpp'
+DONE (0s)
+****Executing witness generation****
+DONE (1s)
+****Converting witness to json****

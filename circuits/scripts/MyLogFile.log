@@ -1,0 +1,29 @@
+Fri Jun 30 09:40:53 2023  [TRACE]: Start Initializing a b c A
+Fri Jun 30 09:40:53 2023  [TRACE]: Processing coefs
+Fri Jun 30 09:40:53 2023  [TRACE]: Calculating c
+Fri Jun 30 09:40:53 2023  [TRACE]: Initializing fft
+Fri Jun 30 09:40:53 2023  [TRACE]: Start iFFT A
+Fri Jun 30 09:40:54 2023  [TRACE]: a After ifft:
+Fri Jun 30 09:40:54 2023  [TRACE]: Start Shift A
+Fri Jun 30 09:40:54 2023  [TRACE]: a After shift:
+Fri Jun 30 09:40:54 2023  [TRACE]: Start FFT A
+Fri Jun 30 09:40:55 2023  [TRACE]: a After fft:
+Fri Jun 30 09:40:55 2023  [TRACE]: Start iFFT B
+Fri Jun 30 09:40:55 2023  [TRACE]: b After ifft:
+Fri Jun 30 09:40:55 2023  [TRACE]: Start Shift B
+Fri Jun 30 09:40:55 2023  [TRACE]: b After shift:
+Fri Jun 30 09:40:55 2023  [TRACE]: Start FFT B
+Fri Jun 30 09:40:56 2023  [TRACE]: b After fft:
+Fri Jun 30 09:40:56 2023  [TRACE]: Start iFFT C
+Fri Jun 30 09:40:56 2023  [TRACE]: c After ifft:
+Fri Jun 30 09:40:56 2023  [TRACE]: Start Shift C
+Fri Jun 30 09:40:56 2023  [TRACE]: c After shift:
+Fri Jun 30 09:40:56 2023  [TRACE]: Start FFT C
+Fri Jun 30 09:40:57 2023  [TRACE]: c After fft:
+Fri Jun 30 09:40:57 2023  [TRACE]: Start ABC
+Fri Jun 30 09:40:57 2023  [TRACE]: abc:
+Fri Jun 30 09:40:57 2023  [TRACE]: Start Multiexp H
+Fri Jun 30 09:41:03 2023  [TRACE]: Start Multiexp A
+Fri Jun 30 09:41:07 2023  [TRACE]: Start Multiexp B1
+Fri Jun 30 09:41:09 2023  [TRACE]: Start Multiexp B2
+Fri Jun 30 09:41:15 2023  [TRACE]: Start Multiexp C

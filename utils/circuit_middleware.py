@@ -30,17 +30,17 @@ def poseidon_committment_verify(sync_committee: SyncCommittee):
     return sync_committee_poseidon, proof
 
 
-def aggregate_bls_verify(sync_committee, sync_committee_bits, sync_committee_signature, signing_root):
+def validate_signed_header(sync_committee, sync_committee_bits, sync_committee_signature, signing_root):
     # convert signature verify input to a format suitable for zk circuis
     with open('./data/signature_verify.json', 'w') as file:
         file.write(signature_verify_data_to_JSON(sync_committee, sync_committee_bits, sync_committee_signature, signing_root))
-    subprocess.run(["ts-node", "./ts/convert_signature_verify.ts"])
+    subprocess.run(["ts-node", "./ts/convert_valid_signed_header.ts"])
     
     # generate signature proof
-    subprocess.run(["./circuits/scripts/build_aggregate_bls_verify.sh"], shell=True)
+    subprocess.run(["./circuits/scripts/build_assert_valid_signed_header.sh"], shell=True)
 
     # retrieve bls verify proof
-    with open('./build/build_aggregate_bls_verify_cpp/build_aggregate_bls_verify_proof.json', 'r') as file:
+    with open('./build/build_assert_valid_signed_header_cpp/build_assert_valid_signed_header_proof.json', 'r') as file:
         signature_proof = json.load(file)
         signature_proof = [
             [int(signature_proof['pi_a'][0]), int(signature_proof['pi_a'][1])], 

@@ -27,7 +27,7 @@ function point_to_bigint(point: PointG1): [bigint, bigint] {
 async function generate_data(b: number = 512) {
   const dirname = path.resolve();
   const rawData = fs.readFileSync(
-    path.join(dirname, "data/signature_verify.json")
+    path.join(dirname, "data/valid_signed_header.json")
   );
   const signatureVerifyData = JSON.parse(rawData.toString());
 
@@ -50,7 +50,7 @@ async function generate_data(b: number = 512) {
   const syncCommitteeFilename = path.join(
     dirname,
     "data",
-    `input_signature_verify.json`
+    `input_valid_signed_header.json`
   );
   
   console.log("Writing input to file", syncCommitteeFilename);

@@ -2,10 +2,7 @@
 PHASE1=../../resources/powersOfTau28_hez_final_27.ptau
 BUILD_DIR=`realpath ../../build`
 CIRCUIT_NAME=sync_committee_committments
-TEST_DIR=`realpath ../../data`
 OUTPUT_DIR=`realpath "$BUILD_DIR"/"$CIRCUIT_NAME"_cpp`
-NODE_PATH=node
-SNARKJS_PATH=snarkjs
 
 run() {
     if [ ! -d "$BUILD_DIR" ]; then
@@ -15,7 +12,7 @@ run() {
 
     echo "****COMPILING CIRCUIT****"
     start=`date +%s`
-    circom ".."/"$CIRCUIT_NAME".circom --O1 --r1cs --sym --c --output "$BUILD_DIR"
+    circom ../"$CIRCUIT_NAME".circom --O1 --r1cs --sym --c --output "$BUILD_DIR"
     end=`date +%s`
     echo "DONE ($((end-start))s)"
 
@@ -27,7 +24,7 @@ run() {
 
     echo "****Executing witness generation****"
     start=`date +%s`
-    "$OUTPUT_DIR"/"$CIRCUIT_NAME" "$TEST_DIR"/input_sync_committee_committments.json "$OUTPUT_DIR"/witness.wtns
+    "$OUTPUT_DIR"/"$CIRCUIT_NAME" ../../data/input_sync_committee_committments.json "$OUTPUT_DIR"/witness.wtns
     end=`date +%s`
     echo "DONE ($((end-start))s)"
 
@@ -39,19 +36,19 @@ run() {
 
     echo "****GENERATING ZKEY 0****"
     start=`date +%s`
-    $NODE_PATH --trace-gc --trace-gc-ignore-scavenger --max-old-space-size=2048000 --initial-old-space-size=2048000 --no-global-gc-scheduling --no-incremental-marking --max-semi-space-size=1024 --initial-heap-size=2048000 --expose-gc $SNARKJS_PATH zkey new "$BUILD_DIR"/"$CIRCUIT_NAME".r1cs "$PHASE1" "$OUTPUT_DIR"/"$CIRCUIT_NAME"_p1.zkey
+    node --trace-gc --trace-gc-ignore-scavenger --max-old-space-size=2048000 --initial-old-space-size=2048000 --no-global-gc-scheduling --no-incremental-marking --max-semi-space-size=1024 --initial-heap-size=2048000 --expose-gc snarkjs zkey new "$BUILD_DIR"/"$CIRCUIT_NAME".r1cs "$PHASE1" "$OUTPUT_DIR"/"$CIRCUIT_NAME"_p1.zkey
     end=`date +%s`
     echo "DONE ($((end-start))s)"
 
     echo "****CONTRIBUTE TO PHASE 2 CEREMONY****"
     start=`date +%s`
-    $NODE_PATH $SNARKJS_PATH zkey contribute "$OUTPUT_DIR"/"$CIRCUIT_NAME"_p1.zkey "$OUTPUT_DIR"/"$CIRCUIT_NAME"_p2.zkey -n="First phase2 contribution" -e="some random text for entropy"
+    node snarkjs zkey contribute "$OUTPUT_DIR"/"$CIRCUIT_NAME"_p1.zkey "$OUTPUT_DIR"/"$CIRCUIT_NAME"_p2.zkey -n="First phase2 contribution" -e="some random text for entropy"
     end=`date +%s`
     echo "DONE ($((end-start))s)"
 
     echo "****VERIFYING FINAL ZKEY****"
     start=`date +%s`
-    $NODE_PATH --trace-gc --trace-gc-ignore-scavenger --max-old-space-size=2048000 --initial-old-space-size=2048000 --no-global-gc-scheduling --no-incremental-marking --max-semi-space-size=1024 --initial-heap-size=2048000 --expose-gc $SNARKJS_PATH zkey verify "$BUILD_DIR"/"$CIRCUIT_NAME".r1cs "$PHASE1" "$OUTPUT_DIR"/"$CIRCUIT_NAME"_p2.zkey
+    node --trace-gc --trace-gc-ignore-scavenger --max-old-space-size=2048000 --initial-old-space-size=2048000 --no-global-gc-scheduling --no-incremental-marking --max-semi-space-size=1024 --initial-heap-size=2048000 --expose-gc snarkjs zkey verify "$BUILD_DIR"/"$CIRCUIT_NAME".r1cs "$PHASE1" "$OUTPUT_DIR"/"$CIRCUIT_NAME"_p2.zkey
     end=`date +%s`
     echo "DONE ($((end-start))s)"
 
@@ -63,7 +60,7 @@ run() {
 
     echo "****GENERATING PROOF FOR SAMPLE INPUT****"
     start=`date +%s`
-    ~/Code/rapidsnark/build/prover "$OUTPUT_DIR"/"$CIRCUIT_NAME"_p2.zkey "$OUTPUT_DIR"/witness.wtns "$OUTPUT_DIR"/"$CIRCUIT_NAME"_proof.json "$OUTPUT_DIR"/"$CIRCUIT_NAME"_public.json
+    "../../resources/rapidsnark/build/prover" "$OUTPUT_DIR"/"$CIRCUIT_NAME"_p2.zkey "$OUTPUT_DIR"/witness.wtns "$OUTPUT_DIR"/"$CIRCUIT_NAME"_proof.json "$OUTPUT_DIR"/"$CIRCUIT_NAME"_public.json
     end=`date +%s`
     echo "DONE ($((end-start))s)"
 

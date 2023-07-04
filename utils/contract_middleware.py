@@ -9,7 +9,7 @@ from utils.specs import (
 
 from utils.serialize import light_client_bootstrap_to_string, light_client_update_to_string, sync_committee_to_string
 
-from utils.circuit_middleware import poseidon_committment_verify, aggregate_bls_verify
+from utils.circuit_middleware import poseidon_committment_verify, validate_signed_header
 
 from utils.ssz.ssz_typing import uint64
 
@@ -100,7 +100,7 @@ def process_light_client_update(update: LightClientUpdate,
         )
     )
 
-    signature_proof = aggregate_bls_verify(
+    signature_proof = validate_signed_header(
         sync_committee, 
         update.sync_aggregate.sync_committee_bits, 
         update.sync_aggregate.sync_committee_signature, 

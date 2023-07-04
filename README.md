@@ -1,2 +1,2 @@
-# ethereum-light-client-py
-Repository for playing around with Ethereum (Beacon chain) light client in Python
+# Beacon Bridge
+Bridge between the Ethereum beacon chain and an EVM-based blockchain.

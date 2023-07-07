@@ -1,5 +1,8 @@
 pragma solidity ^0.8.17;
 
+/*
+* @author https://github.com/succinctlabs/eth-proof-of-consensus
+*/
 library Pairing {
 	struct G1Point {
 		uint256 X;

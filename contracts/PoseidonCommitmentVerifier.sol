@@ -1,6 +1,9 @@
 pragma solidity ^0.8.17;
 import "./libraries/Pairing.sol";
 
+/*
+* author https://github.com/succinctlabs/eth-proof-of-consensus
+*/
 contract PoseidonCommitmentVerifier {
 	struct CommitmentMappingVerifyingKey {
 		Pairing.G1Point alfa1;

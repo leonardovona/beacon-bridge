@@ -3,7 +3,13 @@ pragma solidity ^0.8.17;
 import "./Constants.sol";
 
 library Utils {
-    // taken from https://medium.com/coinmonks/math-in-solidity-part-5-exponent-and-logarithm-9aef8515136e
+    /*
+    * @author https://medium.com/coinmonks/math-in-solidity-part-5-exponent-and-logarithm-9aef8515136e
+    * @dev Computes the binary logarithm of a number either rounded down or up depending on the ceil parameter.
+    * @param x The number whose binary logarithm is to be computed.
+    * @param ceil If true, returns the ceil of the binary logarithm of x. Otherwise, returns the floor.
+    * @return The binary logarithm of x.
+    */
     function log2(uint256 x, bool ceil) internal pure returns (uint256 n) {
         if (x >= 2**128) { x >>= 128; n += 128; }
         if (x >= 2**64) { x >>= 64; n += 64; }
@@ -16,7 +22,12 @@ library Utils {
         if(ceil) { if (x >= 2**0) { n += 1; } }
     }
 
-     // https://ethereum.stackexchange.com/questions/83626/how-to-reverse-byte-order-in-uint256-or-bytes32
+    /*
+    * @author https://ethereum.stackexchange.com/questions/83626/how-to-reverse-byte-order-in-uint256-or-bytes32
+    * @dev Reverses the bytes of a uint256.
+    * @param input The uint256 to be reversed.
+    * @return The reversed input.
+    */
     function reverse(uint256 input) internal pure returns (uint256 v) {
         v = input;
         // swap bytes
@@ -31,25 +42,49 @@ library Utils {
         v = (v >> 128) | (v << 128);
     }
 
+    /*
+    * @dev Converts a uint64 to bytes32.
+    * @param a The uint64 to be converted.
+    * @return The bytes32 representation of a.
+    */
     function toBytes(uint64 a) internal pure returns (bytes32) {
         return bytes32(reverse(uint256(a)));
     }
     
-    // Clock utilities
+    /*
+    * @dev Computes the Beacon chain epoch for a given slot.
+    * @param slot The slot to compute the epoch for.
+    * @return The epoch for the given slot.
+    */
     function computeEpochAtSlot(uint64 slot) internal pure returns (uint64) {
         return slot / SLOTS_PER_EPOCH;
     }
 
+    /*
+    * @dev Computes the Beacon chain sync committee period for a given epoch.
+    * @param epoch The epoch to compute the sync committee period for.
+    * @return The sync committee period for the given epoch.
+    */
     function computeSyncCommitteePeriod(uint64 epoch) internal pure returns (uint64) {
         return epoch / EPOCHS_PER_SYNC_COMMITTEE_PERIOD;
     }
 
+    /*
+    * @dev Computes the Beacon chain sync committee period for a given slot.
+    * @param slot The slot to compute the sync committee period for.
+    * @return The sync committee period for the given slot.
+    */
     function computeSyncCommitteePeriodAtSlot(uint64 slot) internal pure returns (uint64) {
         return computeSyncCommitteePeriod(computeEpochAtSlot(slot));
     }
 
-    // This can be avoided using constants
+    /*
+    * @dev Converts a generalized index to a subtree index. See the Ethereum specs for details.
+    * @param generalizedIndex The generalized index to convert.
+    * @return The subtree index corresponding to generalizedIndex.
+    */
     function getSubtreeIndex(uint256 generalizedIndex) internal pure returns (uint256) {
+        //This can be avoided using constants
         return (generalizedIndex % (2**(log2({x: generalizedIndex, ceil: false}))));
     }
 

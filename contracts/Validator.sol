@@ -1,24 +1,20 @@
 pragma solidity ^0.8.17;
 pragma experimental ABIEncoderV2;
 
-//import "hardhat/console.sol";
 import "./Constants.sol";
 import "./Structs.sol";
 import "./Utils.sol";
 import "./Merkleize.sol";
 
+// Verifier for the BLS signature validity proof
 import "./BLSAggregatedSignatureVerifier.sol";
 
+/*
+* @dev This contract implements the light client update validation logic.
+*/
 contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
-    // Attributes
-    mapping(bytes32 => bytes32) public sszToPoseidon;
 
-    // Events
-    event BootstrapComplete(uint64 slot);
-
-    event UpdateProcessed(uint64 slot);
-
-    // This is to avoid stack too deep
+    // Struct to store variables for the validateLightClientUpdate function, to avoid stack too deep errors.
     struct LightClientUpdateVars {
         uint64 syncCommitteeParticipants;
         uint64 storePeriod;
@@ -27,27 +23,43 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
         bool updateHasNextSyncCommittee;
         Structs.SyncCommittee emptySyncCommittee;
         bytes32 finalizedRoot;
-        bytes32 syncCommitteeRoot;
         bytes[] participantPubkeys;
         bytes32 signingRoot;
     }
 
+    /*
+    * @dev Validates a light client update.
+    * @param store The light client store.
+    * @param update The light client update.
+    * @param currentSlot The current slot.
+    * @param genesisValidatorsRoot The genesis validators root.
+    * @param syncCommittee The sync committee that signed the update.
+    * @param syncCommitteeRoot The root of the sync committee.
+    * @param syncCommitteePoseidonRoot The Poseidon hash of the sync committee.
+    * @param proof The proof that syncCommittee has signed the update.
+    */
     function validateLightClientUpdate(
         Structs.LightClientStore memory store,
         Structs.LightClientUpdate calldata update, 
         uint64 currentSlot, 
         bytes32 genesisValidatorsRoot, 
         Structs.SyncCommittee calldata syncCommittee,
+        bytes32 syncCommitteeRoot,
+        bytes32 syncCommitteePoseidonRoot,
         Structs.Groth16Proof calldata proof
     ) public view{
         LightClientUpdateVars memory vars;
+
+        // Calculate the number of participants in the sync committee.
         for (uint256 i; i < update.syncAggregate.syncCommitteeBits.length; ++i) {
             if (update.syncAggregate.syncCommitteeBits[i]) { ++vars.syncCommitteeParticipants; }
         }
         require(vars.syncCommitteeParticipants >= MIN_SYNC_COMMITTEE_PARTICIPANTS, "Not enough sync committee participants");
 
+        // Verifies that the attested header is valid.
         require(isValidLightClientHeader(update.attestedHeader), "Invalid attested header");
 
+        // Verifies that the slots are valid.
         require(currentSlot >= update.signatureSlot, "Invalid signature slot");
         require(update.signatureSlot > update.attestedHeader.beacon.slot, "Invalid signature slot");
         require(update.attestedHeader.beacon.slot >= update.finalizedHeader.beacon.slot, "Invalid attested header slot");
@@ -66,11 +78,11 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
 
         require((update.attestedHeader.beacon.slot > store.beaconSlot) || vars.updateHasNextSyncCommittee, "Invalid attested header slot");
 
+        // Finalized header verification
         if (!isFinalityUpdate(update)) {
             // The finalized header must be empty
             require(update.finalizedHeader.beacon.bodyRoot == bytes32(0), "Invalid finalized header");
         } else {
-            
             if (update.finalizedHeader.beacon.slot == GENESIS_SLOT) {
                 require(update.finalizedHeader.beacon.bodyRoot == bytes32(0), "Invalid finalized header");
             } else {
@@ -88,6 +100,7 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
             );
         }
 
+        // Sync committee verification
         if (!isSyncCommitteeUpdate(update)) {
             // This can be improved
             require(keccak256(update.nextSyncCommittee.aggregatePubkey) != keccak256(vars.emptySyncCommittee.aggregatePubkey), "Invalid sync committee update");
@@ -108,14 +121,14 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
             );
         }
 
-        // Structs.SyncCommittee memory syncCommittee;
-        vars.syncCommitteeRoot = hashTreeRoot(syncCommittee);
+        // The sync committee passed as a parameter must be the same as the one in the store.
         if (vars.updateSignaturePeriod == vars.storePeriod) {
-            require(vars.syncCommitteeRoot == store.currentSyncCommitteeRoot, "Invalid sync committee");
+            require(syncCommitteeRoot == store.currentSyncCommitteeRoot, "Invalid sync committee");
         } else {
-            require(vars.syncCommitteeRoot == store.nextSyncCommitteeRoot, "Invalid sync committee");
+            require(syncCommitteeRoot == store.nextSyncCommitteeRoot, "Invalid sync committee");
         }
 
+        // Retain the public keys of the sync committee participants.
         vars.participantPubkeys = new bytes[](vars.syncCommitteeParticipants);
         uint256 j;
         for (uint256 i; i < SYNC_COMMITTEE_SIZE; ++i) {
@@ -124,7 +137,8 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
                 ++j;
             }
         }
-
+        
+        // Compute the signing root.
         vars.signingRoot = computeSigningRoot(
             update.attestedHeader.beacon, 
             computeDomain(
@@ -133,11 +147,12 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
             )
         );
 
-        // !! BLS signature verification
-        require(zkBLSVerify(vars.signingRoot, vars.syncCommitteeRoot, vars.syncCommitteeParticipants, proof), "Signature is invalid");
+        // BLS signature proof verification
+        require(zkBLSVerify(vars.signingRoot, syncCommitteePoseidonRoot, vars.syncCommitteeParticipants, proof), "Signature is invalid");
     }
 
     /*
+    * @author https://github.com/succinctlabs/eth-proof-of-consensus
     * @dev Does an aggregated BLS signature verification with a zkSNARK. The proof asserts that:
     *   Poseidon(validatorPublicKeys) == sszToPoseidon[syncCommitteeRoot]
     *   aggregatedPublicKey = InnerProduct(validatorPublicKeys, bitmap)
@@ -145,14 +160,14 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
     */
     function zkBLSVerify(
         bytes32 signingRoot, 
-        bytes32 syncCommitteeRoot, 
+        bytes32 syncCommitteePoseidonRoot, 
         uint256 claimedParticipation, 
         Structs.Groth16Proof memory proof
     ) internal view returns (bool) {
-        require(sszToPoseidon[syncCommitteeRoot] != 0, "Must map SSZ commitment to Posedion commitment");
+        require(syncCommitteePoseidonRoot != 0, "Must map SSZ commitment to Posedion commitment");
         uint256[34] memory inputs;
         inputs[0] = claimedParticipation;
-        inputs[1] = uint256(sszToPoseidon[syncCommitteeRoot]);
+        inputs[1] = uint256(syncCommitteePoseidonRoot);
         uint256 signingRootNumeric = uint256(signingRoot);
         for (uint256 i = 0; i < 32; i++) {
             inputs[(32 - 1 - i) + 2] = signingRootNumeric % 2 ** 8;
@@ -161,6 +176,11 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
         return verifySignatureProof(proof.a, proof.b, proof.c, inputs);
     }
 
+    /*
+    * @dev Verifies that a light client header is valid by verifying the Merkle proof.
+    * @param header The light client header.
+    * @return True if the header is valid, false otherwise.
+    */
     function isValidLightClientHeader(Structs.LightClientHeader calldata header) public view returns (bool) {
         return
             isValidMerkleBranch(
@@ -172,11 +192,21 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
             );
     }
 
-    // Not sure if this check is correct. There is for sure a better way to do this
+    /*
+    * @dev Checks if the next sync committee is known.
+    * @param nextSyncCommitteeRoot The root of the next sync committee.
+    * @return True if the next sync committee is known, false otherwise.
+    */
     function isNextSyncCommitteeKnown(bytes32 nextSyncCommitteeRoot) public pure returns (bool) {
         return nextSyncCommitteeRoot != bytes32(0);
     }
 
+    /*
+    * @dev Computes the Ethereum beacon chain domain (see the specs for details).
+    * @param forkVersion The fork version.
+    * @param genesisValidatorsRoot The genesis validators root.
+    * @return The domain.
+    */
     function computeDomain(bytes4 forkVersion, bytes32 genesisValidatorsRoot) private view returns (bytes32) {
         //not sure
         bytes32[] memory chunks = new bytes32[](2);
@@ -194,6 +224,12 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
         return bytes32(domain);
     }
 
+    /*
+    * @dev Computes the signing root (see the specs for details).
+    * @param beacon The beacon block header.
+    * @param domain The domain.
+    * @return The signing root.
+    */
     function computeSigningRoot(Structs.BeaconBlockHeader calldata beacon, bytes32 domain) private view returns (bytes32) {
         bytes32[] memory chunks = new bytes32[](2);
         chunks[0] = hashTreeRoot(beacon);
@@ -202,14 +238,24 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
         return merkleize_chunks(chunks, 2);
     }
 
-    // Not sure if it is correct
+    /*
+    * @dev Checks if the update is a sync committee update.
+    * @param update The light client update.
+    * @return True if the update is a sync committee update, false otherwise.
+    */
     function isSyncCommitteeUpdate(Structs.LightClientUpdate calldata update) public pure returns (bool) {
+        // Not sure if it is correct
         for (uint256 i; i < NEXT_SYNC_COMMITTEE_INDEX_LOG_2; ++i) {
             if (update.nextSyncCommitteeBranch[i] != bytes32(0)) { return true; }
         }
         return false;
     }
 
+    /*
+    * @dev Checks if the update is a finality update.
+    * @param update The light client update.
+    * @return True if the update is a finality update, false otherwise.
+    */
     function isFinalityUpdate(Structs.LightClientUpdate calldata update) public pure returns (bool) {
         for (uint256 i; i < FINALIZED_ROOT_INDEX_LOG_2; ++i) {
             if (update.finalityBranch[i] != bytes32(0)) { return true; }
@@ -217,6 +263,11 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
         return false;
     }
 
+    /*
+    * @dev Computes the fork version for a given epoch.
+    * @param epoch The epoch.
+    * @return The fork version.
+    */
     function computeForkVersion(uint256 epoch) private pure returns (bytes4) {
         if (epoch >= CAPELLA_FORK_EPOCH) return CAPELLA_FORK_VERSION;
         if (epoch >= BELLATRIX_FORK_EPOCH) return BELLATRIX_FORK_VERSION;

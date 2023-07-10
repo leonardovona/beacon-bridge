@@ -1,13 +1,13 @@
+/* 
+* Adapted from: https://github.com/succinctlabs/eth-proof-of-consensus/blob/main/circuits/test/generate_input_data.ts
+*/
 import path from "path";
 import fs from "fs";
 
-import { PointG1, aggregatePublicKeys, sign } from "@noble/bls12-381";
-import { toHexString } from "@chainsafe/ssz";
+import { PointG1 } from "@noble/bls12-381";
 
 import {
-  formatHex,
   bigint_to_array,
-  hexToIntArray,
   sigHexAsSnarkInput,
   msg_hash
 } from "./bls_utils";
@@ -24,14 +24,21 @@ function point_to_bigint(point: PointG1): [bigint, bigint] {
   return [x.value, y.value];
 }
 
-async function generate_data(b: number = 512) {
+/*
+* Convert data to a suitable format for signature verification circuit.
+* Pubkeys are converted first to G1 points and then to bigints.
+* A similar process is followed for the signature and the signing root (Hm).
+* The input data is taken from a file in the data folder.
+* The output is written to a file in the data folder.
+*/
+async function convertValidSignedHeaderData(b: number = 512) {
   const dirname = path.resolve();
   const rawData = fs.readFileSync(
-    path.join(dirname, "data/valid_signed_header.json")
+    path.join(dirname, "data/signature_verify.json")
   );
-  const signatureVerifyData = JSON.parse(rawData.toString());
+  const validSignedHeaderData = JSON.parse(rawData.toString());
 
-  const pubkeys = signatureVerifyData.pubkeys.map((pubkey: any, idx: number) => {
+  const pubkeys = validSignedHeaderData.pubkeys.map((pubkey: any, idx: number) => {
     const point = PointG1.fromHex((pubkey).substring(2));
     const bigints = point_to_bigint(point);
     return [
@@ -40,24 +47,24 @@ async function generate_data(b: number = 512) {
     ];
   });
 
-  const syncCommitteeConverted = {
+  const validSignedHeaderConverted = {
     pubkeys: pubkeys,
-    pubkeybits: signatureVerifyData.pubkeybits,
-    signature: sigHexAsSnarkInput(signatureVerifyData.signature, "array"),
-    Hm: await msg_hash(signatureVerifyData.Hm, "array"),
+    pubkeybits: validSignedHeaderData.pubkeybits,
+    signature: sigHexAsSnarkInput(validSignedHeaderData.signature, "array"),
+    Hm: await msg_hash(validSignedHeaderData.Hm, "array"),
   };
 
-  const syncCommitteeFilename = path.join(
+  const validSignedHeaderFilename = path.join(
     dirname,
     "data",
-    `input_valid_signed_header.json`
+    `input_signature_verify.json`
   );
   
-  console.log("Writing input to file", syncCommitteeFilename);
+  console.log("Writing input to file", validSignedHeaderFilename);
   fs.writeFileSync(
-    syncCommitteeFilename,
-    JSON.stringify(syncCommitteeConverted)
+    validSignedHeaderFilename,
+    JSON.stringify(validSignedHeaderConverted)
   );
 }
 
-generate_data();
+convertValidSignedHeaderData();

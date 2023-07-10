@@ -1,3 +1,7 @@
+"""
+Taken from: https://github.com/ethereum/consensus-specs/tree/dev/tests/core/pyspec/eth2spec/utils/ssz
+"""
+
 from typing import TypeVar
 
 from remerkleable.basic import uint

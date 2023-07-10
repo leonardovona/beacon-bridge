@@ -1,3 +1,6 @@
+"""
+Middleware for beacon chain data
+"""
 import requests
 from utils.specs import Root, LightClientBootstrap, LightClientFinalityUpdate
 from utils.parsing import parse_header, parse_sync_committee, parse_sync_aggregate, parse_light_client_updates

@@ -1,4 +1,3 @@
-
 from utils.specs import (
     Slot, SLOTS_PER_EPOCH, config
 )

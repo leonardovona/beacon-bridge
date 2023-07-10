@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PHASE1=`realpath ../pot25_final.ptau`
-BUILD_DIR=`realpath ../../build`
+BUILD_DIR=`realpath ../build`
 CIRCUIT_NAME=assert_valid_signed_header
 OUTPUT_DIR=`realpath "$BUILD_DIR"/"$CIRCUIT_NAME"_cpp`
 

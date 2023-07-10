@@ -1,5 +1,5 @@
 # """
-# This is a copy of part of the ethereum specs
+# Adapted from: https://github.com/ethereum/consensus-specs/tree/dev/tests/core/pyspec/eth2spec
 # """
 
 from dataclasses import (
@@ -221,6 +221,7 @@ class LightClientStore(object):
     current_max_active_participants: uint64
 
 
+# Customized light client store, which is used for storing on-chain data
 @dataclass
 class MyLightClientStore(object):
     beacon_slot: uint64

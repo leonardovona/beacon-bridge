@@ -1,3 +1,7 @@
+"""
+Taken from: https://github.com/ethereum/consensus-specs/tree/dev/tests/core/pyspec/eth2spec/utils/ssz
+"""
+
 # flake8: noqa
 # Ignore linter: This module makes importing SSZ types easy, and hides away the underlying library from the spec.
 

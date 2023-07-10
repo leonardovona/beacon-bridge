@@ -1,6 +1,6 @@
 #!/bin/bash
 PHASE1=../../resources/powersOfTau28_hez_final_27.ptau
-BUILD_DIR=`realpath ../../build`
+BUILD_DIR=`realpath ../build`
 CIRCUIT_NAME=sync_committee_committments
 OUTPUT_DIR=`realpath "$BUILD_DIR"/"$CIRCUIT_NAME"_cpp`
 

@@ -18,7 +18,7 @@ The life cycle of the light client is the following:
         2a. Get the sync committee updates from the trusted block sync period to the current sync period
         2b. Process and update the light client store
     3. Start the following tasks:
-        3a. Poll for optimistic updates
+        (removed) 3a. Poll for optimistic updates
         3b. Poll for finality updates
         3c. Poll for sync committee updates
 """
@@ -42,7 +42,7 @@ import math, asyncio
 
 # Takes into account possible clock drifts. The low value provides protection against a server sending updates too far in the future
 MAX_CLOCK_DISPARITY_SEC = 10
-FINALITY_UPDATE_POLL_INTERVAL = 48  # Da modificare
+FINALITY_UPDATE_POLL_INTERVAL = 48
 LOOKAHEAD_EPOCHS_COMMITTEE_SYNC = 8
 NEXT_SYNC_COMMITTEE_INDEX_LOG_2 = 5
 FINALIZED_ROOT_INDEX_LOG_2 = 6
@@ -86,6 +86,9 @@ def chunkify_range(from_period, to_period, items_per_chunk):
 def process_light_client_finality_update(finality_update: LightClientFinalityUpdate,
                                          current_slot: Slot,
                                          genesis_validators_root: Root) -> None:
+    """
+    Process a finality update by calling the light client contract
+    """
     update = LightClientUpdate(
         attested_header=finality_update.attested_header,
         next_sync_committee=SyncCommittee(),
@@ -102,6 +105,9 @@ def process_light_client_finality_update(finality_update: LightClientFinalityUpd
 def process_light_client_optimistic_update(optimistic_update: LightClientOptimisticUpdate,
                                            current_slot: Slot,
                                            genesis_validators_root: Root) -> None:
+    """
+    Process an optimistic update by calling the light client contract
+    """
     update = LightClientUpdate(
         attested_header=optimistic_update.attested_header,
         next_sync_committee=SyncCommittee(),
@@ -117,7 +123,7 @@ def process_light_client_optimistic_update(optimistic_update: LightClientOptimis
 
 async def handle_finality_updates():
     """
-    Tasks which periodically retrieves the latest finality update from the beacon chain node and processes it
+    Task which periodically retrieves the latest finality update from the beacon chain node and processes it
     """
     last_finality_update = None
     while True:
@@ -169,22 +175,20 @@ async def main():
 
     print("Start syncing")
     # Compute the current sync period
-    current_period = compute_sync_committee_period_at_slot(get_current_slot())  # ! cambia con funzioni di mainnet
+    current_period = compute_sync_committee_period_at_slot(get_current_slot()) 
 
     # Compute the sync period associated with the optimistic header
     last_period = compute_sync_committee_period_at_slot(bootstrap_slot)
 
-    # SYNC
+    # Sync the light client store with the beacon chain
     sync(last_period, current_period)
     print("Sync done")
-    # subscribe
+    # Subscribe
     print("Start finality update handler")
     asyncio.create_task(handle_finality_updates())
 
     while True:
-        # ! evaluate to insert an optimistic update
-
-        # when close to the end of a sync period poll for sync committee updates
+        # When close to the end of a sync period poll for sync committee updates
         current_slot = get_current_slot()
         epoch_in_sync_period = compute_epoch_at_slot(current_slot) % EPOCHS_PER_SYNC_COMMITTEE_PERIOD
 

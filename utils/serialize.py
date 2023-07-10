@@ -1,7 +1,14 @@
+"""
+Utility functions for serializing data structures to strings and JSON
+"""
+
 from utils.specs import LightClientBootstrap, LightClientUpdate, LightClientHeader, SyncCommittee, SyncAggregate
 
 
 def light_client_header_to_string(header: LightClientHeader):
+    """
+    Convert a light client header to a string
+    """
     res = "["
     # Beacon block header
     res += "["
@@ -40,6 +47,9 @@ def light_client_header_to_string(header: LightClientHeader):
 
 
 def sync_committee_to_string(committee: SyncCommittee):
+    """
+    Convert a sync committee to a string
+    """
     res = "["
     # Pubkeys
     res += "["
@@ -53,6 +63,9 @@ def sync_committee_to_string(committee: SyncCommittee):
 
 
 def branch_to_string(branch):
+    """
+    Convert a sync committee / finality branch to a string
+    """
     res = "["
     for i in range(len(branch) - 1):
         res += "\"" + str(branch[i]) + "\","
@@ -62,6 +75,9 @@ def branch_to_string(branch):
 
 
 def sync_aggregate_to_string(aggregate: SyncAggregate):
+    """
+    Convert a sync aggregate to a string
+    """
     res = "["
     res += "["
     for i in range(len(aggregate.sync_committee_bits) - 1):
@@ -80,6 +96,9 @@ def sync_aggregate_to_string(aggregate: SyncAggregate):
 
 
 def light_client_bootstrap_to_string(bootstrap: LightClientBootstrap):
+    """
+    Convert a light client bootstrap to a string
+    """
     res = "["
     # Header
     res += light_client_header_to_string(bootstrap.header) + ","
@@ -92,6 +111,9 @@ def light_client_bootstrap_to_string(bootstrap: LightClientBootstrap):
 
 
 def light_client_update_to_string(update: LightClientUpdate):
+    """
+    Convert a light client update to a string
+    """
     res = "["
     # Attested Header
     res += light_client_header_to_string(update.attested_header) + ","
@@ -111,6 +133,9 @@ def light_client_update_to_string(update: LightClientUpdate):
     return res
 
 def sync_committee_to_JSON(sync_committee: SyncCommittee):
+    """
+    Convert a sync committee to a JSON string
+    """
     json = "{\n"
     json += "\t\"pubkeys\": [\n"
     for i in range(len(sync_committee.pubkeys)):
@@ -125,6 +150,9 @@ def sync_committee_to_JSON(sync_committee: SyncCommittee):
     return json
 
 def signature_verify_data_to_JSON(sync_committee: SyncCommittee, syncCommitteeBits, signature: bytes, message_hash: bytes):
+    """
+    Convert signature verification data to a JSON string
+    """
     json = "{\n"
     json += "\t\"pubkeys\": [\n"
     for i in range(len(sync_committee.pubkeys)):

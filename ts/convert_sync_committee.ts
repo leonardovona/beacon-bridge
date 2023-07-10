@@ -1,11 +1,12 @@
+/* 
+* Adapted from: https://github.com/succinctlabs/eth-proof-of-consensus/blob/main/circuits/test/generate_input_data.ts
+*/
 import path from "path";
 import fs from "fs";
 
-import { PointG1, aggregatePublicKeys } from "@noble/bls12-381";
-import { toHexString } from "@chainsafe/ssz";
+import { PointG1 } from "@noble/bls12-381";
 
 import {
-  formatHex,
   bigint_to_array,
   hexToIntArray,
 } from "./bls_utils";
@@ -22,14 +23,19 @@ function point_to_bigint(point: PointG1): [bigint, bigint] {
   return [x.value, y.value];
 }
 
-async function generate_data(b: number = 512) {
+/*
+* Convert sync committee to a suitable format for sync committee committment verification circuit.
+* Pubkeys are converted first to G1 points and then to bigints.
+* The input data is taken from a file in the data folder.
+* The output is written to a file in the data folder.
+*/
+async function convert_sync_committee(b: number = 512) {
   const dirname = path.resolve();
   const rawData = fs.readFileSync(
     path.join(dirname, "data/syncCommittee.json")
   );
   const syncCommittee = JSON.parse(rawData.toString());
 
-  let aggPubkey = PointG1.ZERO;
   const pubkeys = syncCommittee.pubkeys.map((pubkey: any, idx: number) => {
     const point = PointG1.fromHex((pubkey).substring(2));
     const bigints = point_to_bigint(point);
@@ -64,4 +70,4 @@ async function generate_data(b: number = 512) {
   );
 }
 
-generate_data();
+convert_sync_committee();

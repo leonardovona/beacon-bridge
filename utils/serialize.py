@@ -149,7 +149,7 @@ def sync_committee_to_JSON(sync_committee: SyncCommittee):
     json += "}"
     return json
 
-def signature_verify_data_to_JSON(sync_committee: SyncCommittee, syncCommitteeBits, signature: bytes, message_hash: bytes):
+def signature_verify_data_to_JSON(sync_committee: SyncCommittee, syncCommitteeBits, signature: bytes, signing_root: bytes):
     """
     Convert signature verification data to a JSON string
     """
@@ -169,6 +169,6 @@ def signature_verify_data_to_JSON(sync_committee: SyncCommittee, syncCommitteeBi
             json += ", "
     json += "\n\t],\n"
     json += "\t\"signature\": \"" + str(signature) + "\",\n"
-    json += "\t\"Hm\": \"" + str(message_hash) + "\"\n"
+    json += "\t\"signing_root\": \"" + str(signing_root) + "\"\n"
     json += "}"
     return json

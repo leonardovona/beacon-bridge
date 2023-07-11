@@ -106,7 +106,6 @@ def process_light_client_update(update: LightClientUpdate,
     """
     store_period = compute_sync_committee_period_at_slot(store.beacon_slot)
     update_signature_period = compute_sync_committee_period_at_slot(update.signature_slot)
-
     # get sync committee that signed the update
     sync_committee = SyncCommittee()
     if(update_signature_period == store_period):
@@ -116,7 +115,7 @@ def process_light_client_update(update: LightClientUpdate,
 
     # compute the signing root for header signature verification
     signing_root = compute_signing_root(
-        update.attested_header.beacon, 
+        update.attested_header.beacon,
         compute_domain(
             DOMAIN_SYNC_COMMITTEE, 
             compute_fork_version(compute_epoch_at_slot(max(update.signature_slot, Slot(1)) - Slot(1))), 

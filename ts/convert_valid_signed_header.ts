@@ -7,6 +7,7 @@ import fs from "fs";
 import { PointG1 } from "@noble/bls12-381";
 
 import {
+  hexToIntArray,
   bigint_to_array,
   sigHexAsSnarkInput,
   msg_hash
@@ -27,7 +28,7 @@ function point_to_bigint(point: PointG1): [bigint, bigint] {
 /*
 * Convert data to a suitable format for signature verification circuit.
 * Pubkeys are converted first to G1 points and then to bigints.
-* A similar process is followed for the signature and the signing root (Hm).
+* A similar process is followed for the signature and the signing root.
 * The input data is taken from a file in the data folder.
 * The output is written to a file in the data folder.
 */
@@ -51,7 +52,7 @@ async function convertValidSignedHeaderData(b: number = 512) {
     pubkeys: pubkeys,
     pubkeybits: validSignedHeaderData.pubkeybits,
     signature: sigHexAsSnarkInput(validSignedHeaderData.signature, "array"),
-    Hm: await msg_hash(validSignedHeaderData.Hm, "array"),
+    signing_root: hexToIntArray(validSignedHeaderData.signing_root),
   };
 
   const validSignedHeaderFilename = path.join(

@@ -12,7 +12,7 @@ from utils.specs import (
 
 from utils.serialize import light_client_bootstrap_to_string, light_client_update_to_string, sync_committee_to_string
 
-from utils.circuit_middleware import poseidon_committment_verify, validate_signed_header
+from utils.circuit_middleware import poseidon_committment, validate_light_client_update
 
 from utils.ssz.ssz_typing import uint64
 
@@ -65,6 +65,7 @@ def initialize_light_client_store(trusted_block_root: Root,
     Initialize the light client store with the light client bootstrap data by calling the light client contract
     """
     global store
+    global current_sync_committee_poseidon, next_sync_committee_poseidon
     store = MyLightClientStore(
         beacon_slot=uint64(0),
         current_sync_committee=SyncCommittee(),
@@ -74,7 +75,11 @@ def initialize_light_client_store(trusted_block_root: Root,
     )
 
     # generate sync committee poseidon hash and proof
-    sync_committee_poseidon, proof = poseidon_committment_verify(bootstrap.current_sync_committee)
+    sync_committee_poseidon = poseidon_committment(
+        bootstrap.current_sync_committee,
+        bootstrap.current_sync_committee_branch,
+        bootstrap.header
+    )
 
     event_filter = light_client.events.BootstrapComplete.create_filter(fromBlock='latest')
 
@@ -82,8 +87,7 @@ def initialize_light_client_store(trusted_block_root: Root,
     light_client.functions.initializeLightClientStore(
         ast.literal_eval(light_client_bootstrap_to_string(bootstrap)),
         str(trusted_block_root),
-        sync_committee_poseidon,
-        proof
+        sync_committee_poseidon
     ).transact()
 
     # wait for BootstrapComplete event
@@ -96,6 +100,7 @@ def initialize_light_client_store(trusted_block_root: Root,
     # update local view of light client store
     store.beacon_slot = bootstrap.header.beacon.slot
     store.current_sync_committee = bootstrap.current_sync_committee
+    current_sync_committee_poseidon = sync_committee_poseidon
     
     
 def process_light_client_update(update: LightClientUpdate,
@@ -110,32 +115,36 @@ def process_light_client_update(update: LightClientUpdate,
     sync_committee = SyncCommittee()
     if(update_signature_period == store_period):
         sync_committee = store.current_sync_committee
+        sync_committee_poseidon = current_sync_committee_poseidon
     else:
         sync_committee = store.next_sync_committee    
+        sync_committee_poseidon = next_sync_committee_poseidon
 
-    # compute the signing root for header signature verification
-    signing_root = compute_signing_root(
-        update.attested_header.beacon,
-        compute_domain(
+    domain = compute_domain(
             DOMAIN_SYNC_COMMITTEE, 
             compute_fork_version(compute_epoch_at_slot(max(update.signature_slot, Slot(1)) - Slot(1))), 
             str(genesis_validators_root)
         )
-    )
 
     # verify header signature and generate proof
-    signature_proof = validate_signed_header(
+    signature_proof = validate_light_client_update(
         sync_committee, 
         update.sync_aggregate.sync_committee_bits, 
-        update.sync_aggregate.sync_committee_signature, 
-        signing_root)
+        update.sync_aggregate.sync_committee_signature,
+        compute_signing_root(update.attested_header.beacon, domain), # compute the signing root for header signature verification
+        sum(update.sync_aggregate.sync_committee_bits),
+        sync_committee_poseidon
+    )
 
     update_finalized_period = compute_sync_committee_period_at_slot(update.finalized_header.beacon.slot)
 
     if store.next_sync_committee != SyncCommittee() or update_finalized_period == store_period + 1:
         # the update contains a sync committee update
         # generate sync committee poseidon hash and proof
-        sync_committee_poseidon, commitment_mapping_proof = poseidon_committment_verify(update.next_sync_committee)
+        sync_committee_poseidon, commitment_mapping_proof = poseidon_committment(
+            update.next_sync_committee,
+            update.next_sync_committee_branch,
+            update.finalized_header)
         # call with sync committee update
         light_client.functions.processLightClientUpdate(
             ast.literal_eval(light_client_update_to_string(update)),
@@ -169,9 +178,11 @@ def process_light_client_update(update: LightClientUpdate,
     # update local view of light client store
     if store.next_sync_committee != SyncCommittee():
        store.next_sync_committee = update.next_sync_committee
+       next_sync_committee_poseidon = sync_committee_poseidon
     elif update_finalized_period == store_period + 1:
         store.current_sync_committee = store.next_sync_committee
         store.next_sync_committee = update.next_sync_committee
+        next_sync_committee_poseidon = sync_committee_poseidon
         store.previous_max_active_participants = store.current_max_active_participants
         store.current_max_active_participants = 0
     if update.finalized_header.beacon.slot > store.beacon_slot:

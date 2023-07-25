@@ -87,21 +87,27 @@ template AggregateVerify(b, n, k){
     signal input signature[2][2][k];
     signal input Hm[2][2][k];
 
-    component aggregateKey = AccumulatedECCAdd(b,n,k);
-    for (var batch_idx = 0; batch_idx < b; batch_idx++) {
-        aggregateKey.pubkeybits[batch_idx] <== pubkeybits[batch_idx];
-        for (var reg_idx = 0; reg_idx < k; reg_idx++) {
-            for (var x_or_y = 0; x_or_y < 2; x_or_y++) {
-                aggregateKey.pubkeys[batch_idx][x_or_y][reg_idx] <== pubkeys[batch_idx][x_or_y][reg_idx];
+    /* COMPUTE AGGREGATE PUBKEY BASED ON AGGREGATION BITS */
+    component getAggregatePublicKey = G1AddMany(
+        b,
+        9, //log_2 sync committeee size
+        n,
+        k
+    );
+    for (var i = 0; i < b; i++) {
+        aggregateKey.bits[i] <== pubkeybits[i];
+        for (var j = 0; j < 2; j++) {
+            for (var l = 0; l < k; l++) {
+                aggregateKey.pubkeys[i][j][l] <== pubkeys[i][j][l];
             }
         }
     }
+    getAggregatePublicKey.isPointAtInfinity === 0;
 
     component verifySignature = CoreVerifyPubkeyG1(n, k);
     for (var reg_idx = 0; reg_idx < k; reg_idx++) {
         for (var x_or_y = 0; x_or_y < 2; x_or_y++) {
             verifySignature.pubkey[x_or_y][reg_idx] <== aggregateKey.out[x_or_y][reg_idx];
-            log(aggregateKey.out[x_or_y][reg_idx]);
             verifySignature.signature[0][x_or_y][reg_idx] <== signature[0][x_or_y][reg_idx];
             verifySignature.signature[1][x_or_y][reg_idx] <== signature[1][x_or_y][reg_idx];
             verifySignature.hash[0][x_or_y][reg_idx] <== Hm[0][x_or_y][reg_idx];

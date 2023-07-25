@@ -2,8 +2,8 @@
 Utility functions for serializing data structures to strings and JSON
 """
 
-from utils.specs import LightClientBootstrap, LightClientUpdate, LightClientHeader, SyncCommittee, SyncAggregate
-
+from utils.specs import LightClientBootstrap, LightClientUpdate, LightClientHeader, SyncCommittee, SyncAggregate, Domain
+from utils.ssz.ssz_impl import hash_tree_root
 
 def light_client_header_to_string(header: LightClientHeader):
     """
@@ -132,7 +132,25 @@ def light_client_update_to_string(update: LightClientUpdate):
     res += "]"
     return res
 
-def sync_committee_to_JSON(sync_committee: SyncCommittee):
+def convert_sync_committee_poseidon_data_to_JSON(pubkeys):
+    json = "{\n"
+    json += "\t\"pubkeys\": [\n"
+    for i in range(len(pubkeys)):
+        json += "\t\t\"" + str(pubkeys[i]) + "\""
+        if i != len(pubkeys) - 1:
+            json += ",\n"
+        else:
+            json += "\n"
+    json += "\t]\n"
+    json += "}"
+    return json
+
+
+def my_rotate_data_to_JSON(
+        sync_committee: SyncCommittee,
+        sync_committee_poseidon: str,
+        sync_committee_branch,
+        finalized_header: LightClientHeader):
     """
     Convert a sync committee to a JSON string
     """
@@ -145,14 +163,117 @@ def sync_committee_to_JSON(sync_committee: SyncCommittee):
         else:
             json += "\n"
     json += "\t],\n"
-    json += "\t\"aggregatePubkey\": \"" + str(sync_committee.aggregate_pubkey) + "\"\n"
+    json += "\t\"syncCommitteeBranch\": [\n"
+    for i in range(len(sync_committee_branch)):
+        json += "\t\t\"" + str(sync_committee_branch[i]) + "\""
+        if i != len(sync_committee_branch) - 1:
+            json += ",\n"
+        else:
+            json += "\n"
+    json += "\t],\n"
+    json += "\t\"syncCommitteePoseidon\": \"" + str(sync_committee_poseidon) + "\",\n"
+    json += "\t\"finalizedHeaderRoot\": \"" + str(hash_tree_root(finalized_header.beacon)) + "\",\n"
+    json += "\t\"finalizedSlot\": " + str(finalized_header.beacon.slot) + ",\n"
+    json += "\t\"finalizedProposerIndex\": " + str(finalized_header.beacon.proposer_index) + ",\n"
+    json += "\t\"finalizedParentRoot\": \"" + str(finalized_header.beacon.parent_root) + "\",\n"
+    json += "\t\"finalizedStateRoot\": \"" + str(finalized_header.beacon.state_root) + "\",\n"
+    json += "\t\"finalizedBodyRoot\": \"" + str(finalized_header.beacon.body_root) + "\",\n"
     json += "}"
     return json
 
-def signature_verify_data_to_JSON(sync_committee: SyncCommittee, syncCommitteeBits, signature: bytes, signing_root: bytes):
+def validate_light_client_update_data_to_JSON(
+        attested_header: LightClientHeader,
+        finalized_header: LightClientHeader,
+        sync_committee: SyncCommittee, 
+        syncCommitteeBits, 
+        signature: bytes, 
+        domain: Domain,
+        signing_root: bytes,
+        participation: int,
+        sync_committee_poseidon,
+        finality_branch,
+        execution_state_root,
+        execution_branch,
+        public_inputs_poseidon
+    ):
     """
     Convert signature verification data to a JSON string
     """
+    json = "{\n"
+    json += "\t\"attestedHeaderRoot\": \"" + str(hash_tree_root(attested_header.beacon)) + "\",\n"
+    json += "\t\"attestedSlot\": " + str(attested_header.beacon.slot) + ",\n"
+    json += "\t\"attestedProposerIndex\": " + str(attested_header.beacon.proposer_index) + ",\n"
+    json += "\t\"attestedParentRoot\": \"" + str(attested_header.beacon.parent_root) + "\",\n"
+    json += "\t\"attestedStateRoot\": \"" + str(attested_header.beacon.state_root) + "\",\n"
+    json += "\t\"attestedBodyRoot\": \"" + str(attested_header.beacon.body_root) + "\",\n"
+    json += "\t\"finalizedHeaderRoot\": \"" + str(hash_tree_root(finalized_header.beacon)) + "\",\n"
+    json += "\t\"finalizedSlot\": " + str(finalized_header.beacon.slot) + ",\n"
+    json += "\t\"finalizedProposerIndex\": " + str(finalized_header.beacon.proposer_index) + ",\n"
+    json += "\t\"finalizedParentRoot\": \"" + str(finalized_header.beacon.parent_root) + "\",\n"
+    json += "\t\"finalizedStateRoot\": \"" + str(finalized_header.beacon.state_root) + "\",\n"
+    json += "\t\"finalizedBodyRoot\": \"" + str(finalized_header.beacon.body_root) + "\",\n"
+    json += "\t\"pubkeys\": [\n"
+    for i in range(len(sync_committee.pubkeys)):
+        json += "\t\t\"" + str(sync_committee.pubkeys[i]) + "\""
+        if i != len(sync_committee.pubkeys) - 1:
+            json += ",\n"
+        else:
+            json += "\n"
+    json += "\t],\n"
+    json += "\t\"aggregationBits\": [\n"
+    for i in range(len(syncCommitteeBits)):
+        json += "\t\t" + str(int(syncCommitteeBits[i]))
+        if i != len(syncCommitteeBits) - 1:
+            json += ", "
+    json += "\t],\n"
+    json += "\t\"signature\": \"" + str(signature) + "\",\n"
+    json += "\t\"domain\": \"" + str(domain) + "\",\n"
+    json += "\t\"signingRoot\": \"" + str(signing_root) + "\"\n"
+    json += "\t\"participation\": " + str(participation) + ",\n"
+    json += "\t\"syncCommitteePoseidon\": \"" + str(sync_committee_poseidon) + "\",\n"
+    json += "\t\"finalityBranch\": [\n"
+    for i in range(len(finality_branch)):
+        json += "\t\t\"" + str(finality_branch[i]) + "\""
+        if i != len(finality_branch) - 1:
+            json += ",\n"
+        else:
+            json += "\n"
+    json += "\t],\n"
+    json += "\t\"executionStateRoot\": \"" + str(execution_state_root) + "\",\n"
+    json += "\t\"executionStateBranch\": [\n"
+    for i in range(len(execution_branch)):
+        json += "\t\t\"" + str(execution_branch[i]) + "\""
+        if i != len(execution_branch) - 1:
+            json += ",\n"
+        else:
+            json += "\n"
+    json += "\t],\n"
+    json += "\t\"publicInputsRoot\": \"" + str(public_inputs_poseidon) + "\"\n"
+    json += "}"
+    return json
+
+def sync_committee_ssz_data_to_JSON(sync_committee: SyncCommittee):
+    json = "{\n"
+    json += "\t\"pubkeys\": [\n"
+    for i in range(len(sync_committee.pubkeys)):
+        json += "\t\t\"" + str(sync_committee.pubkeys[i]) + "\""
+        if i != len(sync_committee.pubkeys) - 1:
+            json += ",\n"
+        else:
+            json += "\n"
+    json += "\t],\n"
+    json += "\t\"aggregatePubkey\": \"" + str(sync_committee.aggregate_pubkey) + "\",\n"
+    json += "\t\"syncCommitteeSSZ\": \"" + str(hash_tree_root(sync_committee)) + "\"\n"
+    json += "}"
+    return json
+
+def my_step_data_to_JSON(
+        sync_committee: SyncCommittee,
+        sync_committee_bits,
+        sync_committee_signature,
+        signing_root,
+        participation,
+        sync_committee_poseidon):
     json = "{\n"
     json += "\t\"pubkeys\": [\n"
     for i in range(len(sync_committee.pubkeys)):
@@ -163,12 +284,14 @@ def signature_verify_data_to_JSON(sync_committee: SyncCommittee, syncCommitteeBi
             json += "\n"
     json += "\t],\n"
     json += "\t\"pubkeybits\": [\n"
-    for i in range(len(syncCommitteeBits)):
-        json += "\t\t" + str(int(syncCommitteeBits[i]))
-        if i != len(syncCommitteeBits) - 1:
+    for i in range(len(sync_committee_bits)):
+        json += "\t\t" + str(int(sync_committee_bits[i]))
+        if i != len(sync_committee_bits) - 1:
             json += ", "
-    json += "\n\t],\n"
-    json += "\t\"signature\": \"" + str(signature) + "\",\n"
-    json += "\t\"signing_root\": \"" + str(signing_root) + "\"\n"
+    json += "\t],\n"
+    json += "\t\"signature\": \"" + str(sync_committee_signature) + "\",\n"
+    json += "\t\"signingRoot\": \"" + str(signing_root) + "\",\n"
+    json += "\t\"participation\": " + str(participation) + ",\n"
+    json += "\t\"syncCommitteePoseidon\": \"" + str(sync_committee_poseidon) + "\"\n"
     json += "}"
     return json

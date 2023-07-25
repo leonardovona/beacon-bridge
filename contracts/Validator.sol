@@ -148,7 +148,7 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
         );
 
         // BLS signature proof verification
-        require(zkBLSVerify(vars.signingRoot, syncCommitteePoseidonRoot, vars.syncCommitteeParticipants, proof), "Signature is invalid");
+        require(zkBLSVerify(vars.signingRoot, syncCommitteePoseidonRoot, proof), "Signature is invalid");
     }
 
     /*
@@ -160,17 +160,15 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
     */
     function zkBLSVerify(
         bytes32 signingRoot, 
-        bytes32 syncCommitteePoseidonRoot, 
-        uint256 claimedParticipation, 
+        bytes32 syncCommitteePoseidonRoot,
         Structs.Groth16Proof memory proof
     ) internal view returns (bool) {
         require(syncCommitteePoseidonRoot != 0, "Must map SSZ commitment to Posedion commitment");
-        uint256[34] memory inputs;
-        inputs[0] = claimedParticipation;
-        inputs[1] = uint256(syncCommitteePoseidonRoot);
+        uint256[33] memory inputs;
+        inputs[0] = uint256(syncCommitteePoseidonRoot);
         uint256 signingRootNumeric = uint256(signingRoot);
         for (uint256 i = 0; i < 32; i++) {
-            inputs[(32 - 1 - i) + 2] = signingRootNumeric % 2 ** 8;
+            inputs[(32 - 1 - i) + 1] = signingRootNumeric % 2 ** 8;
             signingRootNumeric = signingRootNumeric / 2**8;
         }
         return verifySignatureProof(proof.a, proof.b, proof.c, inputs);

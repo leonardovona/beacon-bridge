@@ -49,10 +49,30 @@ async function convertValidSignedHeaderData(b: number = 512) {
   });
 
   const validSignedHeaderConverted = {
-    pubkeys: pubkeys,
-    pubkeybits: validSignedHeaderData.pubkeybits,
+    attestedHeaderSlot: ,
+    attestedSlot: ,
+    attestedProposerIndex: ,
+    attestedParentRoot: ,
+    attestedStateRoot: ,
+    attestedBodyRoot: ,
+    finalizedHeaderSlot: ,
+    finalizedSlot: ,
+    finalizedProposerIndex: ,
+    finalizedParentRoot: ,
+    finalizedStateRoot: ,
+    finalizedBodyRoot: ,
+    pubkeysX: pubkeys[0],
+    pubkeysY: pubkeys[1],
+    aggregationBits: validSignedHeaderData.pubkeybits,
     signature: sigHexAsSnarkInput(validSignedHeaderData.signature, "array"),
-    signing_root: hexToIntArray(validSignedHeaderData.signing_root),
+    domain: ,
+    signingRoot: hexToIntArray(validSignedHeaderData.signing_root),
+    participation: ,
+    syncCommitteePoseidon: validSignedHeaderData.syncCommitteePoseidon,
+    finalityBranch: ,
+    executionStateRoot: ,
+    executionStateBranch: ,
+    publicInputsRoot: 
   };
 
   const validSignedHeaderFilename = path.join(

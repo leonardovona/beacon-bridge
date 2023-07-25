@@ -43,8 +43,7 @@ contract LightClient is PoseidonCommitmentVerifier {
     function initializeLightClientStore(
         Structs.LightClientBootstrap calldata bootstrap, 
         bytes32 trustedBlockRoot,
-        bytes32 syncCommitteePoseidon,
-        Structs.Groth16Proof calldata proof  
+        bytes32 syncCommitteePoseidon
     ) external {
         // Validate bootstrap.
         require(validator.isValidLightClientHeader(bootstrap.header));
@@ -61,8 +60,6 @@ contract LightClient is PoseidonCommitmentVerifier {
                 bootstrap.header.beacon.stateRoot
             )
         );
-        // Verify the commitment mapping proof.
-        zkMapSSZToPoseidon(currentSyncCommitteeRoot, syncCommitteePoseidon, proof);
 
         // Initialize store.
         store.beaconSlot = bootstrap.header.beacon.slot;
@@ -200,16 +197,16 @@ contract LightClient is PoseidonCommitmentVerifier {
         uint64 updateFinalizedPeriod = Utils.computeSyncCommitteePeriodAtSlot(update.finalizedHeader.beacon.slot);
 
         // Verify the proof for the sync committee committment mapping.
-        bytes32 nextSyncCommitteeRoot = validator.hashTreeRoot(update.nextSyncCommittee);
-        zkMapSSZToPoseidon(nextSyncCommitteeRoot, nextSyncCommitteePoseidon, commitmentMappingProof);
+        bytes32 updateNextSyncCommitteeRoot = validator.hashTreeRoot(update.nextSyncCommittee);
+        bytes32 finalizedHeaderRoot = validator.hashTreeRoot(update.finalizedHeader.beacon);
+        zkMapSSZToPoseidon(updateNextSyncCommitteeRoot, nextSyncCommitteePoseidon, finalizedHeaderRoot, commitmentMappingProof);
 
-        
         if(!validator.isNextSyncCommitteeKnown(store.nextSyncCommitteeRoot)){ // if the next sync committee is not known
             require(updateFinalizedPeriod == storePeriod, "Invalid finalized period");
-            store.nextSyncCommitteeRoot = validator.hashTreeRoot(update.nextSyncCommittee);
+            store.nextSyncCommitteeRoot = updateNextSyncCommitteeRoot;
         } else if(updateFinalizedPeriod == storePeriod + 1) { // if the next sync committee is known and the update is for the next period
             store.currentSyncCommitteeRoot = store.nextSyncCommitteeRoot;
-            store.nextSyncCommitteeRoot = validator.hashTreeRoot(update.nextSyncCommittee);
+            store.nextSyncCommitteeRoot = updateNextSyncCommitteeRoot;
             store.previousMaxActiveParticipants = store.currentMaxActiveParticipants;
             store.currentMaxActiveParticipants = 0;
         }
@@ -224,14 +221,19 @@ contract LightClient is PoseidonCommitmentVerifier {
     * @dev Maps a simple serialize merkle root to a poseidon merkle root with a zkSNARK. The proof asserts that:
     *   SimpleSerialize(syncCommittee) == Poseidon(syncCommittee).
     */
-    function zkMapSSZToPoseidon(bytes32 sszCommitment, bytes32 poseidonCommitment, Structs.Groth16Proof memory proof) private {
-        uint256[33] memory inputs; // inputs is syncCommitteeSSZ[0..32] + [syncCommitteePoseidon]
+    function zkMapSSZToPoseidon(bytes32 sszCommitment, bytes32 poseidonCommitment, bytes32 finalizedHeaderRoot, Structs.Groth16Proof memory proof) private {
+        uint256[65] memory inputs; // inputs is syncCommitteeSSZ[0..32] + [syncCommitteePoseidon]
         uint256 sszCommitmentNumeric = uint256(sszCommitment);
         for (uint256 i = 0; i < 32; i++) {
             inputs[32 - 1 - i] = sszCommitmentNumeric % 2**8;
             sszCommitmentNumeric = sszCommitmentNumeric / 2**8;
         }
         inputs[32] = uint256(poseidonCommitment);
+        uint256 finalizedHeaderRootNumeric = uint256(finalizedHeaderRoot);
+        for (uint256 i = 0; i < 32; i++) {
+            inputs[65 - 1 - i] = finalizedHeaderRootNumeric % 2**8;
+            finalizedHeaderRootNumeric = finalizedHeaderRootNumeric / 2**8;
+        }
         require(verifyCommitmentMappingProof(proof.a, proof.b, proof.c, inputs), "Proof is invalid");
         sszToPoseidon[sszCommitment] = poseidonCommitment;
     }

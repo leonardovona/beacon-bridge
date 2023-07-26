@@ -12,8 +12,8 @@ License: GPL-3
 
 pragma circom 2.0.5;
 
-include "../../ts/node_modules/circomlib/circuits/bitify.circom";
-include "../../ts/node_modules/circomlib/circuits/binsum.circom";
+include "../../../ts/node_modules/circomlib/circuits/bitify.circom";
+include "../../../ts/node_modules/circomlib/circuits/binsum.circom";
 include "./constants.circom";
 include "./ssz.circom";
 

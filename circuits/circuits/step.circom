@@ -1,13 +1,5 @@
 /*
- _____         _                       _     _           
-|_   _|  ___  | |  ___   _ __   __ _  | |_  | |_    _  _ 
-  | |   / -_) | | / -_) | '_ \ / _` | |  _| | ' \  | || |
-  |_|   \___| |_| \___| | .__/ \__,_|  \__| |_||_|  \_, |
-                        |_|                         |__/ 
-
-Created on March 6th 2023 by Succinct Labs
-Code: https://github.com/succinctlabs/telepathy-circuits
-License: GPL-3
+Adapted from: https://github.com/succinctlabs/telepathy-circuits
 */
 
 pragma circom 2.0.5;

@@ -7,8 +7,10 @@ import fs from "fs";
 import { PointG1 } from "@noble/bls12-381";
 
 import {
-  bigint_to_array,
   hexToIntArray,
+  bigint_to_array,
+  sigHexAsSnarkInput,
+  msg_hash
 } from "./bls_utils";
 
 (BigInt.prototype as any).toJSON = function () {
@@ -24,19 +26,20 @@ function point_to_bigint(point: PointG1): [bigint, bigint] {
 }
 
 /*
-* Convert sync committee to a suitable format for sync committee committment verification circuit.
+* Convert data to a suitable format for signature verification circuit.
 * Pubkeys are converted first to G1 points and then to bigints.
+* A similar process is followed for the signature and the signing root.
 * The input data is taken from a file in the data folder.
 * The output is written to a file in the data folder.
 */
-async function convert_sync_committee(b: number = 512) {
+async function convertStepData(b: number = 512) {
   const dirname = path.resolve();
   const rawData = fs.readFileSync(
-    path.join(dirname, "data/sync_committee_poseidon_data.json")
+    path.join(dirname, "data/step_data.json")
   );
-  const syncCommittee = JSON.parse(rawData.toString());
+  const stepData = JSON.parse(rawData.toString());
 
-  const pubkeys = syncCommittee.pubkeys.map((pubkey: any, idx: number) => {
+  const pubkeys = stepData.pubkeys.map((pubkey: any, idx: number) => {
     const point = PointG1.fromHex((pubkey).substring(2));
     const bigints = point_to_bigint(point);
     return [
@@ -53,22 +56,27 @@ async function convert_sync_committee(b: number = 512) {
     pubkeysBigIntY.push(pubkeys[i][1]);
   }
 
-  const syncCommitteeConverted = {
+  const outputData = {
     pubkeysBigIntX: pubkeysBigIntX,
-    pubkeysBigIntY: pubkeysBigIntY
+    pubkeysBigIntY: pubkeysBigIntY,
+    aggregationBits: stepData.pubkeybits,
+    signature: sigHexAsSnarkInput(stepData.signature, "array"),
+    signingRoot: hexToIntArray(stepData.signingRoot),
+    participation: stepData.participation,
+    syncCommitteePoseidon: stepData.syncCommitteePoseidon,
   };
 
-  const syncCommitteeFilename = path.join(
+  const outputFilename = path.join(
     dirname,
     "data",
-    `input_sync_committee_poseidon.json`
+    `input_step.json`
   );
   
-  console.log("Writing input to file", syncCommitteeFilename);
+  console.log("Writing input to file", outputFilename);
   fs.writeFileSync(
-    syncCommitteeFilename,
-    JSON.stringify(syncCommitteeConverted)
+    outputFilename,
+    JSON.stringify(outputData)
   );
 }
 
-convert_sync_committee();
+convertStepData();

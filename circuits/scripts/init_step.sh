@@ -1,6 +1,6 @@
 #!/bin/bash
 PHASE1=../../resources/powersOfTau28_hez_final_27.ptau
-CIRCUIT_NAME=rotate
+CIRCUIT_NAME=step
 BUILD_DIR=`realpath ../build/"$CIRCUIT_NAME"`
 SNARKJS=`realpath ../../node_modules/.bin/snarkjs`
 

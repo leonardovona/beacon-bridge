@@ -38,12 +38,13 @@ contract LightClient is PoseidonCommitmentVerifier {
     * @param bootstrap The bootstrap used to initialize the light client store.
     * @param trustedBlockRoot The root of the block that is trusted by the light client.
     * @param syncCommitteePoseidon The poseidon root of the sync committee.
-    * @param proof The proof for the sync committee committment mapping.
+    * @param genesisValidatorsRoot The genesis validators root of the beacon chain.
     */
     function initializeLightClientStore(
         Structs.LightClientBootstrap calldata bootstrap, 
         bytes32 trustedBlockRoot,
-        bytes32 syncCommitteePoseidon
+        bytes32 syncCommitteePoseidon,
+        bytes32 genesisValidatorsRoot
     ) external {
         // Validate bootstrap.
         require(validator.isValidLightClientHeader(bootstrap.header));
@@ -65,6 +66,7 @@ contract LightClient is PoseidonCommitmentVerifier {
         store.beaconSlot = bootstrap.header.beacon.slot;
         store.currentSyncCommitteeRoot = currentSyncCommitteeRoot;
         sszToPoseidon[currentSyncCommitteeRoot] = syncCommitteePoseidon;
+        store.genesisValidatorsRoot = genesisValidatorsRoot;
 
         emit BootstrapComplete(bootstrap.header.beacon.slot);
     }
@@ -84,29 +86,15 @@ contract LightClient is PoseidonCommitmentVerifier {
     * @dev Processes a light client update without a sync committee update.
     * @param update The light client update to process.
     * @param currentSlot The current slot of the beacon chain.
-    * @param genesisValidatorsRoot The genesis validators root of the beacon chain.
     * @param syncCommittee The sync committee that signed the update.
     * @param signatureProof The proof that the sync committee signed the update.
     */
     function processLightClientUpdate(
         Structs.LightClientUpdate calldata update,
         uint64 currentSlot,
-        bytes32 genesisValidatorsRoot,
         Structs.SyncCommittee calldata syncCommittee,
         Structs.Groth16Proof calldata signatureProof
-    ) external { 
-        // Validate update.
-        bytes32 syncCommitteeRoot = validator.hashTreeRoot(syncCommittee);
-        validator.validateLightClientUpdate(
-            store, 
-            update, 
-            currentSlot, 
-            genesisValidatorsRoot, 
-            syncCommittee, 
-            syncCommitteeRoot,
-            sszToPoseidon[syncCommitteeRoot],
-            signatureProof);
-
+    ) external returns (Structs.ExecutionPayloadHeader memory) {
         ProcessLightClientUpdateVars memory vars;
 
         // Count the number of participants in the sync committee.
@@ -116,17 +104,25 @@ contract LightClient is PoseidonCommitmentVerifier {
 
         // Check if 2/3 of the sync committee signed the update and if the update is more recent than the current known value.
         if (vars.currentParticipants * 3 >= SYNC_COMMITTEE_SIZE * 2 && update.finalizedHeader.beacon.slot > store.beaconSlot) {
+            // Validate update.
+            bytes32 syncCommitteeRoot = validator.hashTreeRoot(syncCommittee);
+                validator.validateLightClientUpdate(
+                store, 
+                update, 
+                currentSlot, 
+                sszToPoseidon[syncCommitteeRoot],
+                signatureProof);
+
             store.beaconSlot = update.finalizedHeader.beacon.slot;
         }
-
         emit UpdateProcessed(update.finalizedHeader.beacon.slot);
+        return update.finalizedHeader.execution;
     }
 
     /*
     * @dev Processes a light client update with a sync committee update.
     * @param update The light client update to process.
     * @param currentSlot The current slot of the beacon chain.
-    * @param genesisValidatorsRoot The genesis validators root of the beacon chain.
     * @param syncCommittee The sync committee that signed the update.
     * @param nextSyncCommitteePoseidon The poseidon root of the next sync committee.
     * @param commitmentMappingProof The proof for the sync committee committment mapping.
@@ -135,24 +131,11 @@ contract LightClient is PoseidonCommitmentVerifier {
     function processLightClientUpdate(
         Structs.LightClientUpdate calldata update,
         uint64 currentSlot,
-        bytes32 genesisValidatorsRoot,
         Structs.SyncCommittee calldata syncCommittee,
-        bytes32 nextSyncCommitteePoseidon, 
+        uint256 nextSyncCommitteePoseidon, 
         Structs.Groth16Proof memory commitmentMappingProof,
         Structs.Groth16Proof calldata signatureProof
-    ) external {
-        // Validate update.
-        bytes32 syncCommitteeRoot = validator.hashTreeRoot(syncCommittee);
-        validator.validateLightClientUpdate(
-            store, 
-            update, 
-            currentSlot, 
-            genesisValidatorsRoot, 
-            syncCommittee, 
-            syncCommitteeRoot,
-            sszToPoseidon[syncCommitteeRoot],
-            signatureProof);
-        
+    ) external returns (Structs.ExecutionPayloadHeader memory) {
         ProcessLightClientUpdateVars memory vars;
 
         // Count the number of participants in the sync committee.
@@ -175,11 +158,20 @@ contract LightClient is PoseidonCommitmentVerifier {
 
         // Check if 2/3 of the sync committee signed the update and if either the update is more recent than the current known value or there is a sync committee update.
         if (vars.currentParticipants * 3 >= SYNC_COMMITTEE_SIZE * 2 && ( update.finalizedHeader.beacon.slot > store.beaconSlot || vars.updateHasFinalizedNextSyncCommittee)) {
+            // Validate update.
+            bytes32 syncCommitteeRoot = validator.hashTreeRoot(syncCommittee);
+            validator.validateLightClientUpdate(
+                store, 
+                update, 
+                currentSlot,
+                sszToPoseidon[syncCommitteeRoot],
+                signatureProof);
             // Apply the update.
             applyLightClientUpdate(update, nextSyncCommitteePoseidon, commitmentMappingProof);
         }
 
         emit UpdateProcessed(update.finalizedHeader.beacon.slot);
+        return update.finalizedHeader.execution;
     }
 
     /*
@@ -190,7 +182,7 @@ contract LightClient is PoseidonCommitmentVerifier {
     */
     function applyLightClientUpdate(
         Structs.LightClientUpdate calldata update,
-        bytes32 nextSyncCommitteePoseidon, 
+        uint256 nextSyncCommitteePoseidon, 
         Structs.Groth16Proof memory commitmentMappingProof
     ) private {
         uint64 storePeriod = Utils.computeSyncCommitteePeriodAtSlot(store.beaconSlot);
@@ -198,8 +190,7 @@ contract LightClient is PoseidonCommitmentVerifier {
 
         // Verify the proof for the sync committee committment mapping.
         bytes32 updateNextSyncCommitteeRoot = validator.hashTreeRoot(update.nextSyncCommittee);
-        bytes32 finalizedHeaderRoot = validator.hashTreeRoot(update.finalizedHeader.beacon);
-        zkMapSSZToPoseidon(updateNextSyncCommitteeRoot, nextSyncCommitteePoseidon, finalizedHeaderRoot, commitmentMappingProof);
+        zkMapSSZToPoseidon(updateNextSyncCommitteeRoot, nextSyncCommitteePoseidon, commitmentMappingProof);
 
         if(!validator.isNextSyncCommitteeKnown(store.nextSyncCommitteeRoot)){ // if the next sync committee is not known
             require(updateFinalizedPeriod == storePeriod, "Invalid finalized period");
@@ -207,8 +198,6 @@ contract LightClient is PoseidonCommitmentVerifier {
         } else if(updateFinalizedPeriod == storePeriod + 1) { // if the next sync committee is known and the update is for the next period
             store.currentSyncCommitteeRoot = store.nextSyncCommitteeRoot;
             store.nextSyncCommitteeRoot = updateNextSyncCommitteeRoot;
-            store.previousMaxActiveParticipants = store.currentMaxActiveParticipants;
-            store.currentMaxActiveParticipants = 0;
         }
         // Update the store slot if the update is more recent than the current known value.
         if(update.finalizedHeader.beacon.slot > store.beaconSlot) {
@@ -221,20 +210,15 @@ contract LightClient is PoseidonCommitmentVerifier {
     * @dev Maps a simple serialize merkle root to a poseidon merkle root with a zkSNARK. The proof asserts that:
     *   SimpleSerialize(syncCommittee) == Poseidon(syncCommittee).
     */
-    function zkMapSSZToPoseidon(bytes32 sszCommitment, bytes32 poseidonCommitment, bytes32 finalizedHeaderRoot, Structs.Groth16Proof memory proof) private {
-        uint256[65] memory inputs; // inputs is syncCommitteeSSZ[0..32] + [syncCommitteePoseidon]
+    function zkMapSSZToPoseidon(bytes32 sszCommitment, uint256 poseidonCommitment, Structs.Groth16Proof memory proof) private {
+        uint256[33] memory inputs; // inputs is syncCommitteeSSZ[0..32] + [syncCommitteePoseidon]
         uint256 sszCommitmentNumeric = uint256(sszCommitment);
         for (uint256 i = 0; i < 32; i++) {
             inputs[32 - 1 - i] = sszCommitmentNumeric % 2**8;
             sszCommitmentNumeric = sszCommitmentNumeric / 2**8;
         }
-        inputs[32] = uint256(poseidonCommitment);
-        uint256 finalizedHeaderRootNumeric = uint256(finalizedHeaderRoot);
-        for (uint256 i = 0; i < 32; i++) {
-            inputs[65 - 1 - i] = finalizedHeaderRootNumeric % 2**8;
-            finalizedHeaderRootNumeric = finalizedHeaderRootNumeric / 2**8;
-        }
+        inputs[32] = poseidonCommitment;
         require(verifyCommitmentMappingProof(proof.a, proof.b, proof.c, inputs), "Proof is invalid");
-        sszToPoseidon[sszCommitment] = poseidonCommitment;
+        sszToPoseidon[sszCommitment] = bytes32(poseidonCommitment);
     }
 }

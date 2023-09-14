@@ -1,3 +1,7 @@
+/*
+Credits: https://github.com/succinctlabs/telepathy-circuits
+*/
+
 pragma circom 2.0.5;
 
 include "./sha256/sha256.circom";

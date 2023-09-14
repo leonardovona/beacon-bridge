@@ -32,19 +32,13 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
     * @param store The light client store.
     * @param update The light client update.
     * @param currentSlot The current slot.
-    * @param genesisValidatorsRoot The genesis validators root.
-    * @param syncCommittee The sync committee that signed the update.
-    * @param syncCommitteeRoot The root of the sync committee.
     * @param syncCommitteePoseidonRoot The Poseidon hash of the sync committee.
     * @param proof The proof that syncCommittee has signed the update.
     */
     function validateLightClientUpdate(
         Structs.LightClientStore memory store,
         Structs.LightClientUpdate calldata update, 
-        uint64 currentSlot, 
-        bytes32 genesisValidatorsRoot, 
-        Structs.SyncCommittee calldata syncCommittee,
-        bytes32 syncCommitteeRoot,
+        uint64 currentSlot,
         bytes32 syncCommitteePoseidonRoot,
         Structs.Groth16Proof calldata proof
     ) public view{
@@ -105,8 +99,7 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
             // This can be improved
             require(keccak256(update.nextSyncCommittee.aggregatePubkey) != keccak256(vars.emptySyncCommittee.aggregatePubkey), "Invalid sync committee update");
         } else {
-            if (vars.updateAttestedPeriod == vars.storePeriod && isNextSyncCommitteeKnown(store.nextSyncCommitteeRoot)
-            ) {
+            if (vars.updateAttestedPeriod == vars.storePeriod && isNextSyncCommitteeKnown(store.nextSyncCommitteeRoot)) {
                 // This can be improved
                 require(hashTreeRoot(update.nextSyncCommittee) == store.nextSyncCommitteeRoot, "Invalid sync committee");
             }
@@ -120,30 +113,13 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
                 ), "Invalid sync committee branch"
             );
         }
-
-        // The sync committee passed as a parameter must be the same as the one in the store.
-        if (vars.updateSignaturePeriod == vars.storePeriod) {
-            require(syncCommitteeRoot == store.currentSyncCommitteeRoot, "Invalid sync committee");
-        } else {
-            require(syncCommitteeRoot == store.nextSyncCommitteeRoot, "Invalid sync committee");
-        }
-
-        // Retain the public keys of the sync committee participants.
-        vars.participantPubkeys = new bytes[](vars.syncCommitteeParticipants);
-        uint256 j;
-        for (uint256 i; i < SYNC_COMMITTEE_SIZE; ++i) {
-            if (update.syncAggregate.syncCommitteeBits[i]) {
-                vars.participantPubkeys[j] = (syncCommittee.pubkeys[i]);
-                ++j;
-            }
-        }
-        
-        // Compute the signing root.
+      
+        // Compute the signing root
         vars.signingRoot = computeSigningRoot(
             update.attestedHeader.beacon, 
             computeDomain(
                 computeForkVersion(Utils.computeEpochAtSlot((update.signatureSlot > 1 ? update.signatureSlot : 1) - 1)),
-                genesisValidatorsRoot
+                store.genesisValidatorsRoot
             )
         );
 
@@ -163,7 +139,7 @@ contract Validator is BLSAggregatedSignatureVerifier, Merkleize {
         bytes32 syncCommitteePoseidonRoot,
         Structs.Groth16Proof memory proof
     ) internal view returns (bool) {
-        require(syncCommitteePoseidonRoot != 0, "Must map SSZ commitment to Posedion commitment");
+        require(syncCommitteePoseidonRoot != 0, "Must map SSZ commitment to Poseidon commitment");
         uint256[33] memory inputs;
         inputs[0] = uint256(syncCommitteePoseidonRoot);
         uint256 signingRootNumeric = uint256(signingRoot);

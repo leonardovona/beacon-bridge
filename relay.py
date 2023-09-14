@@ -1,5 +1,5 @@
 """
-This file implements a very basilar light client for the Ethereum Beacon chain.
+This file implements a very basilar relayer for the Ethereum Beacon chain.
 It uses the executable specifications defined in
     https://github.com/ethereum/consensus-specs/
 and is based on the description of the light client behavior explained in 
@@ -39,7 +39,6 @@ from utils.contract_middleware import (
 )
 import math, asyncio
 
-
 # Takes into account possible clock drifts. The low value provides protection against a server sending updates too far in the future
 MAX_CLOCK_DISPARITY_SEC = 10
 FINALITY_UPDATE_POLL_INTERVAL = 48
@@ -47,16 +46,19 @@ LOOKAHEAD_EPOCHS_COMMITTEE_SYNC = 8
 NEXT_SYNC_COMMITTEE_INDEX_LOG_2 = 5
 FINALIZED_ROOT_INDEX_LOG_2 = 6
 
+import time
 
 def bootstrap():
+    start_time = time.time()
     """
     Starting point of the synchronization process, it retrieves the light client bootstrap data and initializes the light client store
     """
     trusted_block_root = get_trusted_block_root()
     light_client_bootstrap = get_light_client_bootstrap(trusted_block_root)
 
-    initialize_light_client_store(trusted_block_root, light_client_bootstrap)
+    initialize_light_client_store(trusted_block_root, light_client_bootstrap, genesis_validators_root)
 
+    print("Bootstrap: %s" % (time.time() - start_time))
     return light_client_bootstrap.header.beacon.slot
 
 
@@ -128,6 +130,7 @@ async def handle_finality_updates():
     last_finality_update = None
     while True:
         try:
+            start_time = time.time()
             finality_update = get_finality_update()
             if last_finality_update is None or last_finality_update.finalized_header.beacon.slot != finality_update.finalized_header.beacon.slot:
                 last_finality_update = finality_update
@@ -137,6 +140,9 @@ async def handle_finality_updates():
                                                      get_current_slot(
                                                          tolerance=MAX_CLOCK_DISPARITY_SEC),
                                                      genesis_validators_root)
+            end_time = time.time()
+            if(end_time - start_time > 1):
+                print("Update: %s" % (end_time - start_time))
         # In case of sync_committee_bits length is less than 512, remerkleable throws an Exception
         # In case of failure during API call, beacon_api throws an AssertionError
         except (AssertionError, Exception):
@@ -155,11 +161,13 @@ def sync(last_period, current_period):
 
     for (from_period, to_period) in period_ranges:
         count = to_period + 1 - from_period
+        start_time = time.time()
         updates = get_updates_for_period(from_period, count)
 
         for update in updates:
             print("Processing update")
             process_light_client_update(update, get_current_slot(tolerance=MAX_CLOCK_DISPARITY_SEC), genesis_validators_root)
+        print("Sync: %s" % (time.time() - start_time))
             
 
 async def main():

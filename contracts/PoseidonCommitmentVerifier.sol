@@ -261,7 +261,7 @@ contract PoseidonCommitmentVerifier {
 		uint256[2] memory a,
 		uint256[2][2] memory b,
 		uint256[2] memory c,
-		uint256[65] memory input
+		uint256[33] memory input
 	) public view returns (bool r) {
 		CommitmentMappingProof memory proof;
 		proof.A = Pairing.G1Point(a[0], a[1]);

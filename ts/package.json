@@ -1,17 +1,8 @@
 {
   "name": "circuits",
   "version": "1.0.0",
-  "main": "index.js",
-  "repository": "git@github.com:puma314/zk-light-client.git",
   "author": "\"\"",
   "license": "MIT",
-  "scripts": {
-    "build:c": "cd ./scripts && ./build.sh",
-    "build:wasm": "cd ./scripts && ./wasm_build.sh",
-    "build:header": "cd ./scripts && ./build_assert_valid_signed_header.sh",
-    "test": "NODE_OPTIONS=--max_old_space_size=56000 mocha -r tsx test/test*.ts",
-    "sample": "tsx scripts/processUpdateFromData.ts"
-  },
   "devDependencies": {
     "operator": "1.0.0",
     "@chainsafe/bls": "^7.1.1",

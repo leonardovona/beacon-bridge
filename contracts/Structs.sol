@@ -13,8 +13,7 @@ library Structs {
         bytes32 currentSyncCommitteeRoot;
         bytes32 nextSyncCommitteeRoot;
         uint64 beaconSlot;
-        uint64 previousMaxActiveParticipants;
-        uint64 currentMaxActiveParticipants;
+        bytes32 genesisValidatorsRoot;
     }
 
     struct LightClientUpdate {

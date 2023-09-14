@@ -29,14 +29,14 @@ function point_to_bigint(point: PointG1): [bigint, bigint] {
 * The input data is taken from a file in the data folder.
 * The output is written to a file in the data folder.
 */
-async function convert_my_rotate_data(b: number = 512) {
+async function convertRotateData(b: number = 512) {
   const dirname = path.resolve();
   const rawData = fs.readFileSync(
-    path.join(dirname, "data/my_rotate_data.json")
+    path.join(dirname, "data/rotate_data.json")
   );
-  const myRotateData = JSON.parse(rawData.toString());
+  const rotateData = JSON.parse(rawData.toString());
 
-  const pubkeys = myRotateData.pubkeys.map((pubkey: any, idx: number) => {
+  const pubkeys = rotateData.pubkeys.map((pubkey: any, idx: number) => {
     const point = PointG1.fromHex((pubkey).substring(2));
     const bigints = point_to_bigint(point);
     return [
@@ -53,35 +53,24 @@ async function convert_my_rotate_data(b: number = 512) {
     pubkeysBigIntY.push(pubkeys[i][1]);
   }
 
-  const syncCommitteeBranch = myRotateData.syncCommitteeBranch.map((element: any, idx: number) => {
-    return hexToIntArray(element);
-  });
-
-  const myRotateDataConverted = {
+  const outputData = {
+    pubkeysBytes: pubkeys,
     pubkeysBigIntX: pubkeysBigIntX,
-    pubkeysBigIntY: pubkeysBigIntY, 
-    syncCommitteeSSZ: hexToIntArray(myRotateData.syncCommitteeSSZ),
-    syncCommitteeBranch: syncCommitteeBranch,
-    syncCommitteePoseidon: myRotateData.syncCommitteePoseidon,
-    finalizedHeaderRoot: hexToIntArray(myRotateData.finalizedHeaderRoot),
-    finalizedSlot: hexToIntArray(myRotateData.finalizedSlot),
-    finalizedProposerIndex: hexToIntArray(myRotateData.finalizedProposerIndex),
-    finalizedParentRoot: hexToIntArray(myRotateData.finalizedParentRoot),
-    finalizedStateRoot: hexToIntArray(myRotateData.finalizedStateRoot),
-    finalizedBodyRoot: hexToIntArray(myRotateData.finalizedBodyRoot)
-  };
+    pubkeysBigIntY: pubkeysBigIntY,
+    syncCommitteeSSZ: hexToIntArray(rotateData.syncCommitteeSSZ)
+  }
 
-  const myRotateDataFilename = path.join(
+  const outputFilename = path.join(
     dirname,
     "data",
-    `input_sync_committee_committments.json`
+    `input_rotate.json`
   );
   
-  console.log("Writing input to file", myRotateDataFilename);
+  console.log("Writing input to file", outputFilename);
   fs.writeFileSync(
-    myRotateDataFilename,
-    JSON.stringify(myRotateDataConverted)
+    outputFilename,
+    JSON.stringify(outputData)
   );
 }
 
-convert_my_rotate_data();
+convertRotateData();
